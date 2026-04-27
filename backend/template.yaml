@@ -202,7 +202,13 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref HistoryTable
-        - CloudWatchLogsFullAccess   # limitado a log groups específicos, mas simplificado
+        - S3CrudPolicy:
+            BucketName: !Ref TemplatesBucket
+        - CloudWatchLogsFullAccess
+      Environment:
+        Variables:
+          TEMPLATES_BUCKET: !Ref TemplatesBucket
+          TEMPLATES_BUCKET_REGION: !Ref "AWS::Region"
       Events:
         ApiEvent:
           Type: Api
@@ -261,40 +267,9 @@ Resources:
         - Key: AUTOR
           Value: !Ref TagAutor
 
-  # Permissão para Lambda ler/escrever no bucket de templates
-  LambdaS3Policy:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-              - s3:GetObject
-              - s3:PutObject
-            Resource:
-              - !Sub "${TemplatesBucket.Arn}/base/*"
-              - !Sub "${TemplatesBucket.Arn}/generated/*"
+  # (Permissões S3 já incluídas via S3CrudPolicy no OrchestratorFunction)
 
-# Atualizar a definição da Lambda incluir na policy (além do DynamoDB):
-  OrchestratorFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Tags:
-        CLIENTE: !Ref TagCliente
-        AMBIENTE: !Ref TagAmbiente
-        PROJETO: !Ref TagProjeto
-        AUTOR: !Ref TagAutor
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref HistoryTable
-        - S3CrudPolicy:
-            BucketName: !Ref TemplatesBucket
-        - CloudWatchLogsFullAccess
-      Environment:
-        Variables:
-          TEMPLATES_BUCKET: !Ref TemplatesBucket
-          TEMPLATES_BUCKET_REGION: !Ref AWS::Region
+  # (OrchestratorFunction já definido acima com todas as policies)
 
   StateMachine:
     Type: AWS::Serverless::StateMachine
