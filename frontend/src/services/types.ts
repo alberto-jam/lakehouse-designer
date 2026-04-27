@@ -4,6 +4,10 @@ export interface ArchitectureInput {
   avg_query_complexity: "low" | "medium" | "high";
   max_query_latency_sec: number;
   concurrent_users: number;
+  dms_cdc_enabled: boolean;
+  dms_cdc_db_count?: number;
+  data_source_count: number;
+  external_api_count: number;
 }
 
 export interface ArchitectureOutput {
