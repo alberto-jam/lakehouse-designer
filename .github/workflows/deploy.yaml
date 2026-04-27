@@ -81,6 +81,17 @@ jobs:
               "TagProjeto=LAKEHOUSE-DESIGNER" \
               "TagAutor=ALBERTO MOREIRA"
 
+      - name: Upload Jinja2 templates to S3
+        run: |
+          TEMPLATES_BUCKET=$(aws cloudformation describe-stack-resources \
+            --stack-name ${{ env.SAM_STACK_NAME }} \
+            --logical-resource-id TemplatesBucket \
+            --query 'StackResources[0].PhysicalResourceId' \
+            --output text)
+          aws s3 cp backend/redshift_lakehouse.yaml.j2 "s3://${TEMPLATES_BUCKET}/base/redshift_lakehouse.yaml.j2"
+          aws s3 cp backend/athena_lakehouse.yaml.j2 "s3://${TEMPLATES_BUCKET}/base/athena_lakehouse.yaml.j2"
+          echo "Templates uploaded to s3://${TEMPLATES_BUCKET}/base/"
+
       - name: Get CloudFormation outputs
         id: get-outputs
         run: |
