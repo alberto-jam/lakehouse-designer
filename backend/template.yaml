@@ -299,7 +299,6 @@ Resources:
   StateMachine:
     Type: AWS::Serverless::StateMachine
     Properties:
-      DefinitionUri: s3://.../statemachine.asl.json  # ou inline
       Definition:
         StartAt: DecideArchitecture
         States:
@@ -324,14 +323,22 @@ Resources:
     Properties:
       CodeUri: src/
       Handler: decide.lambda_handler
-      ...
+      Tags:
+        CLIENTE: !Ref TagCliente
+        AMBIENTE: !Ref TagAmbiente
+        PROJETO: !Ref TagProjeto
+        AUTOR: !Ref TagAutor
 
   GenerateTemplateFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
       Handler: generate.lambda_handler
-      ...
+      Tags:
+        CLIENTE: !Ref TagCliente
+        AMBIENTE: !Ref TagAmbiente
+        PROJETO: !Ref TagProjeto
+        AUTOR: !Ref TagAutor
 
   TaskTable:
     Type: AWS::DynamoDB::Table
@@ -357,20 +364,11 @@ Resources:
         - Key: AUTOR
           Value: !Ref TagAutor
 
-  ApiStatusEndpoint:
-    Type: AWS::Serverless::Api
-    Properties:
-      StageName: prod
-      DefinitionBody:
-        swagger: "2.0"
-        paths:
-          /task/{taskId}/status:
-            get:
-              x-amazon-apigateway-integration:
-                type: aws_proxy
-                httpMethod: POST
-                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TaskStatusFunction.Arn}/invocations"
-              responses: {}
+  # TODO: ApiStatusEndpoint e TaskStatusFunction serão implementados em fase futura
+  # ApiStatusEndpoint:
+  #   Type: AWS::Serverless::Api
+  #   Properties:
+  #     StageName: prod
 
   High5xxErrorAlarm:
     Type: AWS::CloudWatch::Alarm
