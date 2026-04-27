@@ -1,16 +1,19 @@
 import { SignatureV4 } from "@aws-sdk/signature-v4";
 import { HttpRequest } from "@aws-sdk/protocol-http";
 import { Sha256 } from "@aws-crypto/sha256-js";
-import type { ArchitectureInput, ArchitectureOutput, AwsCredentialsInput } from "./types";
+import { getCredentials } from "./credentialsService";
+import type { ArchitectureInput, ArchitectureOutput } from "./types";
 
 const API_URL = import.meta.env.VITE_API_URL;
-const AWS_REGION = import.meta.env.VITE_AWS_REGION;
+const AWS_REGION = import.meta.env.VITE_AWS_REGION || "us-east-1";
 const TIMEOUT_MS = 30_000;
 
 export async function generateArchitecture(
-  payload: ArchitectureInput,
-  credentials: AwsCredentialsInput
+  payload: ArchitectureInput
 ): Promise<ArchitectureOutput> {
+  // Obtém credenciais automaticamente via Cognito Identity Pool
+  const credentials = await getCredentials();
+
   const signer = new SignatureV4({
     credentials: {
       accessKeyId: credentials.accessKeyId,
@@ -56,7 +59,7 @@ export async function generateArchitecture(
 
     if (response.status === 403) {
       throw new Error(
-        "Erro de autorização. Suas credenciais podem ter expirado ou ser inválidas. Clique em 'Alterar Credenciais' para informar novas credenciais."
+        "Erro de autorização. Suas credenciais podem ter expirado. Recarregue a página."
       );
     }
 
@@ -70,15 +73,11 @@ export async function generateArchitecture(
     clearTimeout(timeoutId);
 
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error(
-        "A requisição excedeu o tempo limite. Tente novamente."
-      );
+      throw new Error("A requisição excedeu o tempo limite. Tente novamente.");
     }
 
     if (error instanceof TypeError) {
-      throw new Error(
-        "Erro de conexão. Verifique sua rede e tente novamente."
-      );
+      throw new Error("Erro de conexão. Verifique sua rede e tente novamente.");
     }
 
     throw error;

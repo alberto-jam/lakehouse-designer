@@ -16,9 +16,3 @@ export interface ArchitectureOutput {
   message: string;
   cloudformation_template_url?: string;
 }
-
-export interface AwsCredentialsInput {
-  accessKeyId: string;
-  secretAccessKey: string;
-  sessionToken: string;
-}

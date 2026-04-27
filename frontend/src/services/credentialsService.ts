@@ -1,36 +1,53 @@
-import type { AwsCredentialsInput } from "./types";
+import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers";
 
-const CREDENTIALS_KEY = "lakehouse_aws_credentials";
-
-export function getCredentials(): AwsCredentialsInput | null {
-  const raw = localStorage.getItem(CREDENTIALS_KEY);
-  if (raw === null) {
-    return null;
-  }
-  try {
-    return JSON.parse(raw) as AwsCredentialsInput;
-  } catch {
-    return null;
-  }
+export interface ResolvedCredentials {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  expiration?: Date;
 }
 
-export function saveCredentials(creds: AwsCredentialsInput): boolean {
-  if (
-    !creds.accessKeyId.trim() ||
-    !creds.secretAccessKey.trim() ||
-    !creds.sessionToken.trim()
-  ) {
-    return false;
+let cachedCredentials: ResolvedCredentials | null = null;
+
+/**
+ * Obtém credenciais temporárias via Cognito Identity Pool.
+ * As credenciais são cacheadas e renovadas automaticamente quando expiram.
+ */
+export async function getCredentials(): Promise<ResolvedCredentials> {
+  // Reutilizar credenciais válidas em cache
+  if (cachedCredentials?.expiration && cachedCredentials.expiration > new Date()) {
+    return cachedCredentials;
   }
-  localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(creds));
-  return true;
+
+  const identityPoolId = import.meta.env.VITE_AWS_IDENTITY_POOL_ID;
+  const region = import.meta.env.VITE_AWS_REGION || "us-east-1";
+
+  if (!identityPoolId) {
+    throw new Error("Identity Pool ID não configurado (VITE_AWS_IDENTITY_POOL_ID)");
+  }
+
+  const provider = fromCognitoIdentityPool({
+    identityPoolId,
+    clientConfig: { region },
+  });
+
+  const creds = await provider();
+  cachedCredentials = {
+    accessKeyId: creds.accessKeyId,
+    secretAccessKey: creds.secretAccessKey,
+    sessionToken: creds.sessionToken,
+    expiration: creds.expiration,
+  };
+
+  return cachedCredentials;
 }
 
-export function clearCredentials(): void {
-  localStorage.removeItem(CREDENTIALS_KEY);
-}
-
+/** Verifica se as credenciais estão disponíveis (Identity Pool configurado) */
 export function hasCredentials(): boolean {
-  const raw = localStorage.getItem(CREDENTIALS_KEY);
-  return raw !== null && raw.length > 0;
+  return !!import.meta.env.VITE_AWS_IDENTITY_POOL_ID;
+}
+
+/** Limpa credenciais do cache (força renovação no próximo request) */
+export function clearCredentials(): void {
+  cachedCredentials = null;
 }
