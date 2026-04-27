@@ -1,0 +1,452 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: "Lake House Designer - Backend API e Frontend hosting"
+
+Parameters:
+  FrontendBucketName:
+    Type: String
+    Default: "lakehouse-designer-frontend"
+    Description: Nome único do bucket S3 para o SPA (será prefixado com account ID/region)
+  
+  Environment:
+    Type: String
+    Default: "prd"
+    AllowedValues: ["dev", "prd"]
+
+  TemplatesBucketName:
+    Type: String
+    Default: "lakehouse-designer-templates"
+    Description: Bucket para armazenar templates base e gerados
+
+  TagCliente:
+    Type: String
+    Default: "FORCEONE"
+    Description: Tag CLIENTE para recursos AWS
+
+  TagAmbiente:
+    Type: String
+    Default: "DEV"
+    AllowedValues:
+      - "DEV"
+      - "PRD"
+    Description: Tag AMBIENTE para recursos AWS
+
+  TagProjeto:
+    Type: String
+    Default: "LAKEHOUSE-DESIGNER"
+    Description: Tag PROJETO para recursos AWS
+
+  TagAutor:
+    Type: String
+    Default: "ALBERTO MOREIRA"
+    Description: Tag AUTOR para recursos AWS
+
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 28
+    MemorySize: 512
+    Environment:
+      Variables:
+        ENV: !Ref Environment
+        TABLE_NAME: !Ref HistoryTable
+
+Resources:
+  # ==================== S3 BUCKET PARA FRONTEND ====================
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${FrontendBucketName}-${AWS::AccountId}-${AWS::Region}"
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+      Tags:
+        - Key: CLIENTE
+          Value: !Ref TagCliente
+        - Key: AMBIENTE
+          Value: !Ref TagAmbiente
+        - Key: PROJETO
+          Value: !Ref TagProjeto
+        - Key: AUTOR
+          Value: !Ref TagAutor
+    DeletionPolicy: Retain
+
+  # Origin Access Identity para CloudFront
+  CloudFrontOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "OAI for ${FrontendBucket}"
+
+  # Política do bucket permitindo apenas OAI
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOAI.S3CanonicalUserId
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+  # ==================== CLOUDFRONT ====================
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      Tags:
+        - Key: CLIENTE
+          Value: !Ref TagCliente
+        - Key: AMBIENTE
+          Value: !Ref TagAmbiente
+        - Key: PROJETO
+          Value: !Ref TagProjeto
+        - Key: AUTOR
+          Value: !Ref TagAutor
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: "index.html"
+        PriceClass: PriceClass_100
+        HttpVersion: http2
+        IPV6Enabled: true
+        Comment: "Lake House Designer SPA"
+        Aliases: []
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOAI}"
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          MinTTL: 0
+          DefaultTTL: 3600
+          MaxTTL: 86400
+          Compress: true
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: "/index.html"
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: "/index.html"
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  # ==================== DYNAMODB (HISTÓRICO) ====================
+  HistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "LakeHouseHistory-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: CLIENTE
+          Value: !Ref TagCliente
+        - Key: AMBIENTE
+          Value: !Ref TagAmbiente
+        - Key: PROJETO
+          Value: !Ref TagProjeto
+        - Key: AUTOR
+          Value: !Ref TagAutor
+
+  # ==================== LAMBDA ORCHESTRATOR ====================
+  OrchestratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: orchestrator.lambda_handler
+      Tags:
+        CLIENTE: !Ref TagCliente
+        AMBIENTE: !Ref TagAmbiente
+        PROJETO: !Ref TagProjeto
+        AUTOR: !Ref TagAutor
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HistoryTable
+        - CloudWatchLogsFullAccess   # limitado a log groups específicos, mas simplificado
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LakeHouseAPI
+            Path: /generate-architecture
+            Method: POST
+            Auth:
+              Authorizer: AWS_IAM
+
+  # ==================== API GATEWAY ====================
+  LakeHouseAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "lakehouse-designer-api-${Environment}"
+      StageName: prod
+      EndpointConfiguration: REGIONAL
+      Tags:
+        CLIENTE: !Ref TagCliente
+        AMBIENTE: !Ref TagAmbiente
+        PROJETO: !Ref TagProjeto
+        AUTOR: !Ref TagAutor
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date'"
+        AllowOrigin: "'*'"  # Em produção, restrinja ao domínio do CloudFront
+        MaxAge: "'600'"
+      Auth:
+        DefaultAuthorizer: AWS_IAM
+
+# Fases 3, 4 e 5
+
+  # Bucket para templates (base + gerados)
+  TemplatesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${TemplatesBucketName}-${AWS::AccountId}-${AWS::Region}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireGeneratedTemplates
+            Status: Enabled
+            Prefix: generated/
+            ExpirationInDays: 7
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: CLIENTE
+          Value: !Ref TagCliente
+        - Key: AMBIENTE
+          Value: !Ref TagAmbiente
+        - Key: PROJETO
+          Value: !Ref TagProjeto
+        - Key: AUTOR
+          Value: !Ref TagAutor
+
+  # Permissão para Lambda ler/escrever no bucket de templates
+  LambdaS3Policy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+            Resource:
+              - !Sub "${TemplatesBucket.Arn}/base/*"
+              - !Sub "${TemplatesBucket.Arn}/generated/*"
+
+# Atualizar a definição da Lambda incluir na policy (além do DynamoDB):
+  OrchestratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Tags:
+        CLIENTE: !Ref TagCliente
+        AMBIENTE: !Ref TagAmbiente
+        PROJETO: !Ref TagProjeto
+        AUTOR: !Ref TagAutor
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HistoryTable
+        - S3CrudPolicy:
+            BucketName: !Ref TemplatesBucket
+        - CloudWatchLogsFullAccess
+      Environment:
+        Variables:
+          TEMPLATES_BUCKET: !Ref TemplatesBucket
+          TEMPLATES_BUCKET_REGION: !Ref AWS::Region
+
+  StateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: s3://.../statemachine.asl.json  # ou inline
+      Definition:
+        StartAt: DecideArchitecture
+        States:
+          DecideArchitecture:
+            Type: Task
+            Resource: !GetAtt DecideFunction.Arn
+            Next: GenerateTemplate
+          GenerateTemplate:
+            Type: Task
+            Resource: !GetAtt GenerateTemplateFunction.Arn
+            End: true
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref DecideFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref GenerateTemplateFunction
+        - DynamoDBWritePolicy:
+            TableName: !Ref HistoryTable
+
+  DecideFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: decide.lambda_handler
+      ...
+
+  GenerateTemplateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: generate.lambda_handler
+      ...
+
+  TaskTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "Tasks-${Environment}"
+      AttributeDefinitions:
+        - AttributeName: task_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: task_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: CLIENTE
+          Value: !Ref TagCliente
+        - Key: AMBIENTE
+          Value: !Ref TagAmbiente
+        - Key: PROJETO
+          Value: !Ref TagProjeto
+        - Key: AUTOR
+          Value: !Ref TagAutor
+
+  ApiStatusEndpoint:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      DefinitionBody:
+        swagger: "2.0"
+        paths:
+          /task/{taskId}/status:
+            get:
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TaskStatusFunction.Arn}/invocations"
+              responses: {}
+
+  High5xxErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "LakeHouseDesigner-5xxErrors-${Environment}"
+      Namespace: "AWS/ApiGateway"
+      MetricName: "5XXError"
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref SnsTopic  # Criar tópico SNS para notificações
+      Tags:
+        - Key: CLIENTE
+          Value: !Ref TagCliente
+        - Key: AMBIENTE
+          Value: !Ref TagAmbiente
+        - Key: PROJETO
+          Value: !Ref TagProjeto
+        - Key: AUTOR
+          Value: !Ref TagAutor
+
+  LambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "LakeHouseDesigner-LambdaErrors-${Environment}"
+      Namespace: "AWS/Lambda"
+      MetricName: "Errors"
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanThreshold
+      Tags:
+        - Key: CLIENTE
+          Value: !Ref TagCliente
+        - Key: AMBIENTE
+          Value: !Ref TagAmbiente
+        - Key: PROJETO
+          Value: !Ref TagProjeto
+        - Key: AUTOR
+          Value: !Ref TagAutor
+
+  SnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "lakehouse-designer-alerts-${Environment}"
+      Tags:
+        - Key: CLIENTE
+          Value: !Ref TagCliente
+        - Key: AMBIENTE
+          Value: !Ref TagAmbiente
+        - Key: PROJETO
+          Value: !Ref TagProjeto
+        - Key: AUTOR
+          Value: !Ref TagAutor
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: "alerts@empresa.com"  # Ajustar
+      TopicArn: !Ref SnsTopic
+            
+  # ==================== OUTPUTS ====================
+Outputs:
+  FrontendBucketName:
+    Description: "S3 bucket for frontend files"
+    Value: !Ref FrontendBucket
+  CloudFrontURL:
+    Description: "CloudFront distribution URL"
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  CloudFrontDistributionId:
+    Description: "CloudFront distribution ID for cache invalidation"
+    Value: !Ref CloudFrontDistribution
+  ApiEndpoint:
+    Description: "API Gateway endpoint"
+    Value: !Sub "https://${LakeHouseAPI}.execute-api.${AWS::Region}.amazonaws.com/prod"

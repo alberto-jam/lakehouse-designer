@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+backend/.aws-sam/
+
+# Environment files
+.env
+frontend/.env
+
+# AWS credentials (NEVER commit)
+*.csv
+datalake-designer-admin_accessKeys.csv
+
+# SAM installation (local)
+sam-installation/
+aws-sam-cli-linux-x86_64.zip
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

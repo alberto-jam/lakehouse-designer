@@ -1,0 +1,3 @@
+{
+    "body": "{\"data_volume_tb\":12,\"records_per_day_millions\":100,\"avg_query_complexity\":\"high\",\"max_query_latency_sec\":4,\"concurrent_users\":15}"
+}

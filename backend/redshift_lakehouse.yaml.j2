@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Lake House with Redshift - Generated on {{ current_date }}
+Parameters:
+  ProjectName:
+    Type: String
+    Default: {{ project_name }}
+  DataBucketName:
+    Type: String
+    Default: !Sub "${ProjectName}-data"
+  RedshiftNodeType:
+    Type: String
+    Default: {{ redshift_node_type }}
+  RedshiftNodeCount:
+    Type: Number
+    Default: {{ redshift_node_count }}
+Resources:
+  S3DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref DataBucketName
+      VersioningConfiguration:
+        Status: Enabled
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      DatabaseInput:
+        Name: !Sub "${ProjectName}_glue_db"
+  RedshiftCluster:
+    Type: AWS::Redshift::Cluster
+    Properties:
+      ClusterIdentifier: !Sub "${ProjectName}-cluster"
+      NodeType: !Ref RedshiftNodeType
+      NumberOfNodes: !Ref RedshiftNodeCount
+      ClusterType: multi-node
+      MasterUsername: "admin"
+      MasterUserPassword: "{{ '{{resolve:secretsmanager:redshift-password}}' }}"
+      PubliclyAccessible: false
+      Encrypted: true
+      IamRoles:
+        - !GetAtt RedshiftSpectrumRole.Arn
+  RedshiftSpectrumRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: redshift.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3AndGlueAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "${S3DataBucket.Arn}"
+                  - !Sub "${S3DataBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - glue:GetTable
+                  - glue:GetDatabase
+                Resource: "*"
+  LakeFormationPermissions:
+    Type: AWS::LakeFormation::Permissions
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !GetAtt RedshiftSpectrumRole.Arn
+      Resource:
+        TableResource:
+          DatabaseName: !Ref GlueDatabase
+          Name: "*"
+Outputs:
+  RedshiftEndpoint:
+    Description: "Redshift cluster endpoint"
+    Value: !GetAtt RedshiftCluster.Endpoint.Address
+  S3BucketName:
+    Description: "Data bucket name"
+    Value: !Ref DataBucketName

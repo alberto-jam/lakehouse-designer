@@ -1,0 +1,863 @@
+<html>
+
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Generator content="Microsoft Word 15 (filtered)">
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:Wingdings;
+	panose-1:5 0 0 0 0 0 0 0 0 0;}
+@font-face
+	{font-family:"MS Gothic";
+	panose-1:2 11 6 9 7 2 5 8 2 4;}
+@font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Aptos;}
+@font-face
+	{font-family:"\@MS Gothic";
+	panose-1:2 11 6 9 7 2 5 8 2 4;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:8.0pt;
+	margin-left:0cm;
+	line-height:107%;
+	font-size:11.0pt;
+	font-family:"Aptos",sans-serif;}
+.MsoChpDefault
+	{font-size:11.0pt;
+	font-family:"Aptos",sans-serif;}
+.MsoPapDefault
+	{margin-bottom:8.0pt;
+	line-height:107%;}
+@page WordSection1
+	{size:595.3pt 841.9pt;
+	margin:70.85pt 3.0cm 70.85pt 3.0cm;}
+div.WordSection1
+	{page:WordSection1;}
+ /* List Definitions */
+ ol
+	{margin-bottom:0cm;}
+ul
+	{margin-bottom:0cm;}
+-->
+</style>
+
+</head>
+
+<body lang=PT-BR style='word-wrap:break-word'>
+
+<div class=WordSection1>
+
+<p class=MsoNormal><b>Design Técnico – Sistema Gerador de Arquitetura Lake
+House (Autenticação IAM + CloudFormation)</b></p>
+
+<p class=MsoNormal>Ajustando a especificação anterior conforme solicitado:</p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal><b>Autenticação</b>: IAM (via AWS Signature V4) – adequado
+     para uso interno corporativo, integrado ao SSO/AD da empresa.</li>
+ <li class=MsoNormal><b>Saída de IaC</b>: CloudFormation (YAML) em vez de
+     Terraform.</li>
+ <li class=MsoNormal>Demais componentes permanecem similares, com adaptações no
+     frontend (uso de&nbsp;AWS4&nbsp;signer) e no backend (permissões IAM
+     finas).</li>
+</ul>
+
+<div class=MsoNormal align=center style='text-align:center'>
+
+<hr size=1 width="100%" noshade style='color:#F9FAFB' align=center>
+
+</div>
+
+<p class=MsoNormal><b>1. Arquitetura Geral (Atualizada)</b></p>
+
+<p class=MsoNormal>text</p>
+
+<p class=MsoNormal>Copy</p>
+
+<p class=MsoNormal>Download</p>
+
+<p class=MsoNormal>[Usuário corporativo] &#8594; (HTTPS) &#8594; CloudFront
+&#8594; S3 (SPA)</p>
+
+<p class=MsoNormal>                                    <span lang=EN-US>&#8595;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>                            API Gateway
+(REST)</span></p>
+
+<p class=MsoNormal><span lang=EN-US>                            (Autorização:
+AWS_IAM)</span></p>
+
+<p class=MsoNormal><span lang=EN-US>                                    </span>&#8595;</p>
+
+<p class=MsoNormal>                            Lambda (autorizador custom? não:
+API Gateway valida sigv4)</p>
+
+<p class=MsoNormal>                                    &#8595;</p>
+
+<p class=MsoNormal>                            Lambda Orchestrator</p>
+
+<p class=MsoNormal>                                    &#8595;</p>
+
+<p class=MsoNormal>           
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;<span
+lang=EN-US style='font-family:"MS Gothic"'>&#9532;</span>&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</p>
+
+<p class=MsoNormal>            &#8595;                      
+&#8595;                       &#8595;</p>
+
+<p class=MsoNormal>       DynamoDB               Base de Regras          
+Gerador CFN</p>
+
+<p class=MsoNormal>      (histórico)          (S3/Parameter Store)    &#8594;
+S3 (template YAML)</p>
+
+<p class=MsoNormal>                                                           
+&#8595;</p>
+
+<p class=MsoNormal>                                                    URL
+pré-assinada</p>
+
+<p class=MsoNormal>                                                           
+&#8595;</p>
+
+<p class=MsoNormal>                                                  SPA
+&#8594; download</p>
+
+<p class=MsoNormal><b>Mudanças chave</b>:</p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal>API Gateway configurado com método&nbsp;AWS_IAM&nbsp;(assinatura
+     SigV4).</li>
+ <li class=MsoNormal>Frontend (SPA) usa biblioteca&nbsp;aws4&nbsp;ou&nbsp;@aws-sdk/credential-providers&nbsp;para
+     assinar requisições.</li>
+ <li class=MsoNormal>A geração de infraestrutura usa&nbsp;<b>CloudFormation</b>&nbsp;(YAML)
+     ao invés de Terraform.</li>
+</ul>
+
+<div class=MsoNormal align=center style='text-align:center'>
+
+<hr size=1 width="100%" noshade style='color:#F9FAFB' align=center>
+
+</div>
+
+<p class=MsoNormal><b>2. Componentes Detalhados</b></p>
+
+<p class=MsoNormal><b>2.1 Frontend (SPA)</b></p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal><b>Tecnologia</b>: React + AWS SDK v3 (apenas para
+     credenciais e assinatura).</li>
+ <li class=MsoNormal><b>Autenticação IAM</b>:</li>
+ <ul style='margin-top:0cm' type=circle>
+  <li class=MsoNormal>O usuário corporativo já está autenticado no AWS SSO/ADFS
+      ou possui credenciais temporárias (STS).</li>
+  <li class=MsoNormal>A SPA usará&nbsp;Credentials&nbsp;obtidas via&nbsp;fromCognitoIdentityPool&nbsp;ou,
+      mais comum em ambiente corporativo, via&nbsp;<b>Amazon Cognito Identity
+      Pool com provedor SAML/SSO</b>&nbsp;OU diretamente via&nbsp;fromTemporaryCredentials&nbsp;assumindo
+      uma Role.</li>
+  <li class=MsoNormal><b>Simplificação</b>: O desenvolvedor da SPA pode
+      utilizar&nbsp;AWS.config.credentials&nbsp;recuperadas do ambiente da
+      empresa (ex: via&nbsp;aws-amplify&nbsp;com autenticação existente).</li>
+  <li class=MsoNormal>A SPA assina cada chamada à API Gateway usando&nbsp;SignatureV4&nbsp;(do
+      pacote&nbsp;@aws-sdk/signature-v4), com o header&nbsp;Authorization.</li>
+ </ul>
+ <li class=MsoNormal><b>Hospedagem</b>: Bucket S3 privado + CloudFront com OAI.</li>
+</ul>
+
+<p class=MsoNormal><b>2.2 API Gateway</b></p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal><b>Tipo</b>: REST API.</li>
+ <li class=MsoNormal><b>Método</b>:&nbsp;POST /generate-architecture.</li>
+ <li class=MsoNormal><b>Autorização</b>:&nbsp;AWS_IAM&nbsp;(verifica
+     credenciais SigV4).</li>
+ <li class=MsoNormal><b>Política de recurso</b>&nbsp;(exemplo):</li>
+</ul>
+
+<p class=MsoNormal>json</p>
+
+<p class=MsoNormal>Copy</p>
+
+<p class=MsoNormal>Download</p>
+
+<p class=MsoNormal>{</p>
+
+<p class=MsoNormal>  &quot;Effect&quot;: &quot;Allow&quot;,</p>
+
+<p class=MsoNormal>  &quot;Principal&quot;: {</p>
+
+<p class=MsoNormal><span lang=EN-US>    &quot;AWS&quot;: &quot;arn:aws:iam::ACCOUNT:role/InternalLakeHouseUsers&quot;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  },</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;Action&quot;: &quot;execute-api:Invoke&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;Resource&quot;: &quot;execute-api:/*/POST/generate-architecture&quot;</span></p>
+
+<p class=MsoNormal>}</p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal><b>Endpoint</b>: Regional (para menor latência).</li>
+</ul>
+
+<p class=MsoNormal><b>2.3 Lógica de Decisão – Lambda Orchestrator</b></p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal>Permanece em Python 3.12, com regras de negócio para
+     recomendar uso de Redshift.</li>
+ <li class=MsoNormal><b>Alterações</b>:</li>
+ <ul style='margin-top:0cm' type=circle>
+  <li class=MsoNormal>A função terá uma role IAM que permite:</li>
+  <ul style='margin-top:0cm' type=square>
+   <li class=MsoNormal>dynamodb:PutItem,&nbsp;dynamodb:GetItem&nbsp;(tabela de
+       histórico).</li>
+   <li class=MsoNormal>s3:GetObject&nbsp;(arquivo de regras, se externo).</li>
+   <li class=MsoNormal><span lang=EN-US>s3:PutObject&nbsp;(bucket de templates
+       CloudFormation).</span></li>
+  </ul>
+  <li class=MsoNormal><b>Estimativa de custo</b>: mantém simulação local
+      baseada em tabela de preços (ou opcionalmente consulta AWS Pricing API).</li>
+ </ul>
+</ul>
+
+<p class=MsoNormal><b><span lang=EN-US>Saída JSON</span></b><span lang=EN-US>&nbsp;(exemplo):</span></p>
+
+<p class=MsoNormal><span lang=EN-US>json</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Copy</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Download</span></p>
+
+<p class=MsoNormal><span lang=EN-US>{</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;architecture_type&quot;: &quot;full_lakehouse_with_redshift&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;services&quot;: [&quot;S3&quot;, &quot;Glue&quot;,
+&quot;LakeFormation&quot;, &quot;Redshift&quot;, &quot;Athena&quot;, &quot;QuickSight&quot;],</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;estimated_monthly_cost_usd&quot;: 3250,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;diagram_mermaid&quot;: &quot;graph
+TD; S3--&gt;Glue; Glue--&gt;Redshift;&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;cfn_template_url&quot;: &quot;https://bucket.s3.amazonaws.com/.../template.yaml?signature=...&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;provisioning_steps&quot;: [&quot;aws
+cloudformation create-stack ...&quot;]</span></p>
+
+<p class=MsoNormal>}</p>
+
+<p class=MsoNormal><b>2.4 Geração de CloudFormation (YAML)</b></p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal><b>Implementação</b>: Lambda dedicada (pode ser a mesma ou
+     outra função).</li>
+ <li class=MsoNormal><b>Processo</b>:</li>
+ <ol style='margin-top:0cm' start=1 type=1>
+  <li class=MsoNormal>Obter template base CFN armazenado no S3 (ex:&nbsp;redshift_lakehouse.yaml.j2).</li>
+  <li class=MsoNormal>Usar Jinja2 (ou simples&nbsp;str.replace) para preencher
+      valores dinâmicos:</li>
+  <ul style='margin-top:0cm' type=square>
+   <li class=MsoNormal>Nome do bucket S3</li>
+   <li class=MsoNormal>Tipo e número de nós do Redshift</li>
+   <li class=MsoNormal>Configurações do Glue (Crawler, Database)</li>
+   <li class=MsoNormal>Políticas do Lake Formation</li>
+  </ul>
+  <li class=MsoNormal>Salvar arquivo YAML final em bucket de saída (ex:&nbsp;cfn-templates/).</li>
+  <li class=MsoNormal>Gerar URL pré-assinada (válida por 1h).</li>
+  <li class=MsoNormal>Retornar URL no JSON.</li>
+ </ol>
+</ul>
+
+<p class=MsoNormal><b>Exemplo de template base (simplificado)</b>:</p>
+
+<p class=MsoNormal><span lang=EN-US>yaml</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Copy</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Download</span></p>
+
+<p class=MsoNormal><span lang=EN-US>AWSTemplateFormatVersion: 2010-09-09</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Description: Lake House com Redshift</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Parameters:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  DataBucketName:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Type: String</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Resources:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  LakeFormationDataBucket:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Type: AWS::S3::Bucket</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Properties:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      BucketName: !Ref DataBucketName</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  RedshiftCluster:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Type: AWS::Redshift::Cluster</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Properties:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      ClusterType: multi-node</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      NodeType: ra3.xlplus</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      NumberOfNodes: {{ redshift_nodes }}</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      ...</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  GlueDatabase:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Type: AWS::Glue::Database</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Properties:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      DatabaseInput:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>        Name: lakehouse_db</span></p>
+
+<p class=MsoNormal><span lang=EN-US>...</span></p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal>O Lambda substitui&nbsp;{{ redshift_nodes }}&nbsp;pelo
+     valor calculado (ex: 2).</li>
+</ul>
+
+<p class=MsoNormal><b>2.5 Permissões IAM para a SPA (via Role)</b></p>
+
+<p class=MsoNormal>A empresa deve criar uma role IAM que os usuários internos
+podem assumir (ex: via AWS SSO). A role deve permitir apenas a ação&nbsp;execute-api:Invoke&nbsp;no
+recurso da API Gateway.</p>
+
+<p class=MsoNormal><span lang=EN-US>json</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Copy</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Download</span></p>
+
+<p class=MsoNormal><span lang=EN-US>{</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;Version&quot;: &quot;2012-10-17&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;Statement&quot;: [</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    {</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      &quot;Effect&quot;: &quot;Allow&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      &quot;Action&quot;: &quot;execute-api:Invoke&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      &quot;Resource&quot;: &quot;arn:aws:execute-api:region:account:api-id/*/POST/generate-architecture&quot;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    </span>}</p>
+
+<p class=MsoNormal>  ]</p>
+
+<p class=MsoNormal>}</p>
+
+<p class=MsoNormal><b>Não</b>&nbsp;é necessário permitir acesso a S3 ou
+DynamoDB diretamente pelos usuários – todo backend é mediado pela Lambda.</p>
+
+<p class=MsoNormal><b>2.6 Configuração CORS para requisições assinadas</b></p>
+
+<p class=MsoNormal>API Gateway deve responder com&nbsp;Access-Control-Allow-Origin:
+https://app.meudominio.com&nbsp;e headers corretos para preflight. Cuidado:
+preflight (OPTIONS) não carrega assinatura – deve ser público ou usar&nbsp;Mock&nbsp;integração.</p>
+
+<div class=MsoNormal align=center style='text-align:center'>
+
+<hr size=1 width="100%" noshade style='color:#F9FAFB' align=center>
+
+</div>
+
+<p class=MsoNormal><b>3. Fluxo Completo com IAM</b></p>
+
+<ol style='margin-top:0cm' start=1 type=1>
+ <li class=MsoNormal><b>Usuário corporativo</b>&nbsp;faz login no AWS SSO / AD
+     federado, obtém credenciais temporárias (access key, secret, session
+     token).</li>
+ <li class=MsoNormal><b>SPA</b>&nbsp;carrega e obtém essas credenciais
+     (via&nbsp;aws-amplify&nbsp;ou&nbsp;aws-sdk&nbsp;com provedor customizado).</li>
+ <li class=MsoNormal>Usuário preenche parâmetros no formulário.</li>
+ <li class=MsoNormal><b>SPA</b>&nbsp;constrói a requisição HTTP para a URL da
+     API Gateway, assina com&nbsp;SignatureV4&nbsp;usando as credenciais.</li>
+ <li class=MsoNormal><b>API Gateway</b>&nbsp;valida a assinatura e encaminha
+     para Lambda Orchestrator.</li>
+ <li class=MsoNormal><b>Lambda</b>&nbsp;processa regras, gera recomendação,
+     armazena no DynamoDB.</li>
+ <li class=MsoNormal><b>Lambda</b>&nbsp;(ou Step Function) gera template
+     CloudFormation YAML, salva em S3, e retorna URL pré-assinada.</li>
+ <li class=MsoNormal><b>SPA</b>&nbsp;exibe arquitetura e botão de download. O
+     usuário faz o download do template.</li>
+ <li class=MsoNormal>O usuário (ou pipeline) executa&nbsp;aws cloudformation
+     create-stack --template-url ...&nbsp;para provisionar a lake house.</li>
+</ol>
+
+<div class=MsoNormal align=center style='text-align:center'>
+
+<hr size=1 width="100%" noshade style='color:#F9FAFB' align=center>
+
+</div>
+
+<p class=MsoNormal><b>4. Considerações de Segurança (IAM)</b></p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal><b>Role da Lambda</b>&nbsp;deve aderir ao princípio do
+     menor privilégio. Exemplo de política:</li>
+</ul>
+
+<p class=MsoNormal>json</p>
+
+<p class=MsoNormal>Copy</p>
+
+<p class=MsoNormal>Download</p>
+
+<p class=MsoNormal>{</p>
+
+<p class=MsoNormal>  &quot;Effect&quot;: &quot;Allow&quot;,</p>
+
+<p class=MsoNormal>  &quot;Action&quot;: [</p>
+
+<p class=MsoNormal>    &quot;logs:CreateLogGroup&quot;,</p>
+
+<p class=MsoNormal>    &quot;logs:CreateLogStream&quot;,</p>
+
+<p class=MsoNormal>    &quot;logs:PutLogEvents&quot;</p>
+
+<p class=MsoNormal>  ],</p>
+
+<p class=MsoNormal>  &quot;Resource&quot;: &quot;*&quot;</p>
+
+<p class=MsoNormal>},</p>
+
+<p class=MsoNormal>{</p>
+
+<p class=MsoNormal>  &quot;Effect&quot;: &quot;Allow&quot;,</p>
+
+<p class=MsoNormal>  &quot;Action&quot;: [</p>
+
+<p class=MsoNormal>    &quot;dynamodb:PutItem&quot;,</p>
+
+<p class=MsoNormal>    &quot;dynamodb:GetItem&quot;,</p>
+
+<p class=MsoNormal>    &quot;dynamodb:Query&quot;</p>
+
+<p class=MsoNormal>  ],</p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;Resource&quot;: &quot;arn:aws:dynamodb:.../table/LakeHouseHistory&quot;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>},</span></p>
+
+<p class=MsoNormal><span lang=EN-US>{</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;Effect&quot;: &quot;Allow&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;Action&quot;: [&quot;s3:GetObject&quot;,
+&quot;s3:PutObject&quot;],</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  &quot;Resource&quot;: [</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    &quot;arn:aws:s3:::internal-cfn-templates/*&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    &quot;arn:aws:s3:::lakehouse-rules-bucket/*&quot;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  </span>]</p>
+
+<p class=MsoNormal>}</p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal><b>API Gateway</b>&nbsp;log de acesso habilitado
+     (CloudWatch) para rastrear quem chamou.</li>
+ <li class=MsoNormal><b>Bucket de templates CFN</b>: Privado, com ciclo de vida
+     (expirar após 7 dias). Acesso somente via URL pré-assinada.</li>
+ <li class=MsoNormal><b>Nunca expor chaves de acesso no frontend</b>&nbsp;– as
+     credenciais são temporárias e obtidas via SSO/STS.</li>
+</ul>
+
+<div class=MsoNormal align=center style='text-align:center'>
+
+<hr size=1 width="100%" noshade style='color:#F9FAFB' align=center>
+
+</div>
+
+<p class=MsoNormal><b>5. Estimativa de Custo (Ajustada – sem Cognito)</b></p>
+
+<table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width=752
+ style='width:564.0pt;border-collapse:collapse'>
+ <thead>
+  <tr>
+   <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+   <p class=MsoNormal><b>Serviço</b></p>
+   </td>
+   <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'>
+   <p class=MsoNormal><b>Custo mensal (USD)</b></p>
+   </td>
+  </tr>
+ </thead>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>S3 (SPA + templates)</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>~0,50</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>CloudFront</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>~4,00</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>API Gateway (10k calls)</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>~1,00</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>Lambda (2 funções)</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>~2,50</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>DynamoDB</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>~1,50</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>Step Functions (opcional)</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>~2,50</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal><b>Total</b></p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal><b>~12 USD</b></p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoNormal><i>(Cognito removido; IAM não tem custo adicional.)</i></p>
+
+<div class=MsoNormal align=center style='text-align:center'>
+
+<hr size=1 width="100%" noshade style='color:#F9FAFB' align=center>
+
+</div>
+
+<p class=MsoNormal><b>6. Exemplo de Requisição Assinada (Frontend)</b></p>
+
+<p class=MsoNormal>Usando&nbsp;@aws-sdk/signature-v4&nbsp;e&nbsp;@aws-sdk/credential-providers:</p>
+
+<p class=MsoNormal><span lang=EN-US>typescript</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Copy</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Download</span></p>
+
+<p class=MsoNormal><span lang=EN-US>import { SignatureV4 } from &quot;@aws-sdk/signature-v4&quot;;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>import { Sha256 } from &quot;@aws-crypto/sha256-js&quot;;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>import { fromCognitoIdentityPool } from &quot;@aws-sdk/credential-providers&quot;;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>const credentials = await fromCognitoIdentityPool({</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  identityPoolId: &quot;us-east-1:xxx&quot;,
+// Opcional, se usar identidade federada</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  clientConfig: { region: &quot;us-east-1&quot;
+}</span></p>
+
+<p class=MsoNormal><span lang=EN-US>})();</span></p>
+
+<p class=MsoNormal><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>const signer = new SignatureV4({</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  credentials,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  service: &quot;execute-api&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  region: &quot;us-east-1&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  sha256: Sha256,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>});</span></p>
+
+<p class=MsoNormal><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>const request = {</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  method: &quot;POST&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  protocol: &quot;https:&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  hostname: &quot;api-id.execute-api.us-east-1.amazonaws.com&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  path: &quot;/prod/generate-architecture&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  headers: {</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    &quot;Content-Type&quot;: &quot;application/json&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    host: &quot;api-id.execute-api.us-east-1.amazonaws.com&quot;,</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  },</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  body: JSON.stringify({ data_volume_tb: 50,
+... }),</span></p>
+
+<p class=MsoNormal><span lang=EN-US>};</span></p>
+
+<p class=MsoNormal><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>const signed = await signer.sign(request);</span></p>
+
+<p class=MsoNormal><span lang=EN-US>fetch(signed.url, { method: &quot;POST&quot;,
+body: signed.body, headers: signed.headers });</span></p>
+
+<div class=MsoNormal align=center style='text-align:center'>
+
+<hr size=1 width="100%" noshade style='color:#F9FAFB' align=center>
+
+</div>
+
+<p class=MsoNormal><b>7. Template de CloudFormation Gerado (Exemplo de saída)</b></p>
+
+<p class=MsoNormal><span lang=EN-US>yaml</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Copy</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Download</span></p>
+
+<p class=MsoNormal><span lang=EN-US>AWSTemplateFormatVersion: 2010-09-09</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Description: Lake House Architecture -
+Redshift Included</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Parameters:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  Environment:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Type: String</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Default: dev</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Resources:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  RawDataBucket:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Type: AWS::S3::Bucket</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Properties:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      BucketName: !Sub &quot;raw-${Environment}-company&quot;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  LakeFormationPermissions:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Type: AWS::LakeFormation::DataLakeSettings</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Properties:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      Admins:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>        - DataLakePrincipalIdentifier: !GetAtt
+MyGlueRole.Arn</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  RedshiftCluster:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Type: AWS::Redshift::Cluster</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Properties:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      ClusterIdentifier: !Sub &quot;lakehouse-${Environment}&quot;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      NodeType: ra3.xlplus</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      NumberOfNodes: 2</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      ClusterType: multi-node</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      MasterUsername: !Ref AdminUser</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      MasterUserPassword: !Ref
+AdminPassword</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      IamRoles:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>        - !GetAtt RedshiftSpectrumRole.Arn</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  GlueDatabase:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Type: AWS::Glue::Database</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Properties:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>      DatabaseInput:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>        Name: !Sub &quot;lakehouse_${Environment}&quot;</span></p>
+
+<p class=MsoNormal><span lang=EN-US>Outputs:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>  RedshiftEndpoint:</span></p>
+
+<p class=MsoNormal><span lang=EN-US>    Value: !GetAtt
+RedshiftCluster.Endpoint.Address</span></p>
+
+<div class=MsoNormal align=center style='text-align:center'>
+
+<hr size=1 width="100%" noshade style='color:#F9FAFB' align=center>
+
+</div>
+
+<p class=MsoNormal><b>8. Plano de Implementação (Revisado)</b></p>
+
+<table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width=752
+ style='width:564.0pt;border-collapse:collapse'>
+ <thead>
+  <tr>
+   <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+   <p class=MsoNormal><b>Fase</b></p>
+   </td>
+   <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'>
+   <p class=MsoNormal><b>Tarefas</b></p>
+   </td>
+   <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'>
+   <p class=MsoNormal><b>Duração</b></p>
+   </td>
+  </tr>
+ </thead>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>1</p>
+  </td>
+  <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'>
+  <p class=MsoNormal>Bucket S3 + CloudFront + SPA estático</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>1 dia</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>2</p>
+  </td>
+  <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'>
+  <p class=MsoNormal>API Gateway (AWS_IAM) + Lambda de decisão</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>2 dias</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>3</p>
+  </td>
+  <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'>
+  <p class=MsoNormal>Integração DynamoDB + lógica regras</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>1 dia</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>4</p>
+  </td>
+  <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'>
+  <p class=MsoNormal>Geração CloudFormation YAML (Jinja2)</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>2 dias</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>5</p>
+  </td>
+  <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'>
+  <p class=MsoNormal>Frontend: integração com SigV4 e assinatura</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>2 dias</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal>6</p>
+  </td>
+  <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'>
+  <p class=MsoNormal>Testes IAM (roles, permissões) + monitoramento</p>
+  </td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal>1 dia</p>
+  </td>
+ </tr>
+ <tr>
+  <td style='padding:7.5pt 12.0pt 7.5pt 0cm'>
+  <p class=MsoNormal><b>Total</b></p>
+  </td>
+  <td style='padding:7.5pt 12.0pt 7.5pt 12.0pt'></td>
+  <td style='padding:7.5pt 0cm 7.5pt 12.0pt'>
+  <p class=MsoNormal><b>9 dias</b></p>
+  </td>
+ </tr>
+</table>
+
+<div class=MsoNormal align=center style='text-align:center'>
+
+<hr size=1 width="100%" noshade style='color:#F9FAFB' align=center>
+
+</div>
+
+<p class=MsoNormal><b>9. Observações Finais</b></p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal>O uso de&nbsp;<b>autenticação IAM</b>&nbsp;pressupõe que
+     os usuários internos já possuem credenciais AWS (via SSO, roles
+     assumidas). Se não, pode-se combinar com&nbsp;<b>Cognito Identity Pool</b>&nbsp;federado
+     ao AD.</li>
+ <li class=MsoNormal><b>CloudFormation</b>&nbsp;é a ferramenta nativa da AWS
+     para IaC; a geração via templates YAML permite fácil integração com
+     pipelines (CodePipeline, Git).</li>
+ <li class=MsoNormal>O sistema permanece completamente serverless, sem
+     necessidade de gerenciar servidores.</li>
+</ul>
+
+<p class=MsoNormal>&nbsp;</p>
+
+</div>
+
+</body>
+
+</html>

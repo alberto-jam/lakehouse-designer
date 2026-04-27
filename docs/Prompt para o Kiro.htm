@@ -1,0 +1,124 @@
+<html>
+
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Generator content="Microsoft Word 15 (filtered)">
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:Wingdings;
+	panose-1:5 0 0 0 0 0 0 0 0 0;}
+@font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Aptos;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:8.0pt;
+	margin-left:0cm;
+	line-height:107%;
+	font-size:11.0pt;
+	font-family:"Aptos",sans-serif;}
+.MsoChpDefault
+	{font-size:11.0pt;
+	font-family:"Aptos",sans-serif;}
+.MsoPapDefault
+	{margin-bottom:8.0pt;
+	line-height:107%;}
+@page WordSection1
+	{size:595.3pt 841.9pt;
+	margin:70.85pt 3.0cm 70.85pt 3.0cm;}
+div.WordSection1
+	{page:WordSection1;}
+ /* List Definitions */
+ ol
+	{margin-bottom:0cm;}
+ul
+	{margin-bottom:0cm;}
+-->
+</style>
+
+</head>
+
+<body lang=PT-BR style='word-wrap:break-word'>
+
+<div class=WordSection1>
+
+<p class=MsoNormal><b>Prompt para o Kiro</b></p>
+
+<p class=MsoNormal><b>Contexto:</b><br>
+Você é um desenvolvedor frontend especialista em React e AWS. Preciso que
+codifique um SPA (Single Page Application) para um sistema interno corporativo
+chamado&nbsp;<b>Lake House Designer</b>. Este sistema recebe parâmetros do
+usuário (volume de dados, latência, concorrência, etc.) e se comunica com um
+backend serverless (API Gateway + Lambda) que retorna uma arquitetura de Lake
+House recomendada (com ou sem Redshift) e uma estimativa de custo mensal por
+serviço.</p>
+
+<p class=MsoNormal><b>Requisitos obrigatórios:</b></p>
+
+<ol style='margin-top:0cm' start=1 type=1>
+ <li class=MsoNormal><b>Autenticação:</b>&nbsp;Usuários internos assumem uma
+     Role IAM. O frontend deve obter automaticamente credenciais temporárias
+     (access key, secret, session token) do ambiente – assumindo que o
+     navegador já está autenticado na AWS (via SSO, cookies, ou extensão). Na
+     prática, usaremos&nbsp;AWS.config.credentials&nbsp;ou&nbsp;fromCognitoIdentityPool&nbsp;se
+     necessário.</li>
+ <li class=MsoNormal><b>Comunicação com API Gateway:</b>&nbsp;Todas as
+     requisições&nbsp;POST /generate-architecture&nbsp;devem ser assinadas
+     com&nbsp;<b>AWS Signature V4</b>&nbsp;usando as credenciais obtidas.</li>
+ <li class=MsoNormal><b>Formulário de entrada:</b>&nbsp;Campos mínimos (todos
+     obrigatórios, com validação):</li>
+ <ul style='margin-top:0cm' type=circle>
+  <li class=MsoNormal>data_volume_tb&nbsp;(número, terabytes)</li>
+  <li class=MsoNormal>records_per_day_millions&nbsp;(número, milhões de
+      registros/dia)</li>
+  <li class=MsoNormal><span lang=EN-US>avg_query_complexity&nbsp;(select: low,
+      medium, high)</span></li>
+  <li class=MsoNormal>max_query_latency_sec&nbsp;(número, segundos)</li>
+  <li class=MsoNormal>concurrent_users&nbsp;(número, usuários simultâneos)</li>
+ </ul>
+ <li class=MsoNormal><b>Exibição dos resultados:</b></li>
+ <ul style='margin-top:0cm' type=circle>
+  <li class=MsoNormal>Tipo de arquitetura sugerida (ex:
+      &quot;full_lakehouse_with_redshift&quot; ou
+      &quot;light_lakehouse_athena&quot;)</li>
+  <li class=MsoNormal>Lista de serviços AWS recomendados</li>
+  <li class=MsoNormal>Tabela com estimativa de custo mensal&nbsp;<b>por serviço</b>&nbsp;(em
+      USD)</li>
+  <li class=MsoNormal>Diagrama em texto (Mermaid) – renderizado visualmente</li>
+  <li class=MsoNormal>Passos de provisionamento</li>
+ </ul>
+ <li class=MsoNormal><b>Botão para download</b>&nbsp;(futuramente gerará
+     template CloudFormation; inicialmente apenas um placeholder).</li>
+ <li class=MsoNormal><b>Tratamento de erros:</b>&nbsp;Timeout, erro de
+     assinatura, parâmetros inválidos, etc.</li>
+ <li class=MsoNormal><b>Layout responsivo</b>&nbsp;(mobile/desktop) – pode usar
+     Tailwind CSS ou Material-UI.</li>
+</ol>
+
+<p class=MsoNormal><b>Entregáveis:</b></p>
+
+<ul style='margin-top:0cm' type=disc>
+ <li class=MsoNormal>Código fonte completo da SPA (React + TypeScript
+     recomendado) com instruções de build.</li>
+ <li class=MsoNormal>Explicação de como obter as credenciais AWS no ambiente
+     corporativo.</li>
+ <li class=MsoNormal>Integração com o backend já existente (endpoint será
+     fornecido após deploy).</li>
+</ul>
+
+<p class=MsoNormal>A API espera um JSON no corpo da requisição e retorna um
+JSON conforme exemplo abaixo. Use os tipos fornecidos na especificação.</p>
+
+<p class=MsoNormal>&nbsp;</p>
+
+</div>
+
+</body>
+
+</html>

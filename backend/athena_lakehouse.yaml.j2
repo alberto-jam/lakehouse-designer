@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Lake House com Athena e Glue - Gerado em {{ current_date }}
+Parameters:
+  ProjectName:
+    Type: String
+    Default: {{ project_name }}
+    Description: Nome base para os recursos
+  DataBucketName:
+    Type: String
+    Default: !Sub "${ProjectName}-data"
+    Description: Nome do bucket S3 para dados
+  GlueDatabaseName:
+    Type: String
+    Default: !Sub "${ProjectName}_glue_db"
+Resources:
+  # Bucket S3 para dados (raw + curated)
+  S3DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref DataBucketName
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionToInfrequentAccess
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                Days: 30
+          - Id: ExpireOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+  # Glue Database
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      DatabaseInput:
+        Name: !Ref GlueDatabaseName
+        Description: "Database for Lake House tables"
+
+  # Glue Crawler para catalogar dados no S3
+  GlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub "${ProjectName}-crawler"
+      Role: !GetAtt GlueServiceRole.Arn
+      DatabaseName: !Ref GlueDatabaseName
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://${DataBucketName}/curated/"
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "DEPRECATE_IN_DATABASE"
+      Schedule:
+        ScheduleExpression: "cron(0 2 * * ? *)"  # diário às 2h
+
+  # Role para Glue
+  GlueServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: S3AccessForGlue
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub "${S3DataBucket.Arn}/*"
+
+  # Permissões no Lake Formation (governança)
+  LakeFormationPermissions:
+    Type: AWS::LakeFormation::Permissions
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !GetAtt GlueServiceRole.Arn
+      Resource:
+        TableResource:
+          DatabaseName: !Ref GlueDatabaseName
+          Name: "*"
+      Permissions:
+        - "SELECT"
+        - "INSERT"
+        - "ALTER"
+
+Outputs:
+  S3BucketName:
+    Description: "Nome do bucket S3 para dados"
+    Value: !Ref DataBucketName
+  GlueDatabaseName:
+    Description: "Nome do database Glue"
+    Value: !Ref GlueDatabaseName
+  CrawlerName:
+    Description: "Nome do crawler Glue"
+    Value: !Ref GlueCrawler
