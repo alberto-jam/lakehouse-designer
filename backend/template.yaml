@@ -233,7 +233,7 @@ Resources:
         AUTOR: !Ref TagAutor
       Cors:
         AllowMethods: "'POST,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-Content-Sha256'"
         AllowOrigin: "'*'"
         MaxAge: "'600'"
       Auth:
