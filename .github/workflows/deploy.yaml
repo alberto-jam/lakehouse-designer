@@ -65,11 +65,11 @@ jobs:
             --no-fail-on-empty-changeset \
             --resolve-s3 \
             --parameter-overrides \
-              FrontendBucketName=${{ env.S3_BUCKET_PREFIX }} \
-              Environment=prd \
-              TagCliente=FORCEONE \
-              TagAmbiente=PRD \
-              TagProjeto=LAKEHOUSE-DESIGNER \
+              "FrontendBucketName=${{ env.S3_BUCKET_PREFIX }}" \
+              "Environment=prd" \
+              "TagCliente=FORCEONE" \
+              "TagAmbiente=PRD" \
+              "TagProjeto=LAKEHOUSE-DESIGNER" \
               "TagAutor=ALBERTO MOREIRA"
 
       - name: Get CloudFormation outputs
