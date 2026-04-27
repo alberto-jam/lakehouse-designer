@@ -233,11 +233,12 @@ Resources:
         AUTOR: !Ref TagAutor
       Cors:
         AllowMethods: "'POST,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date'"
-        AllowOrigin: "'*'"  # Em produção, restrinja ao domínio do CloudFront
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
         MaxAge: "'600'"
       Auth:
         DefaultAuthorizer: AWS_IAM
+        AddDefaultAuthorizerToCorsPreflight: false
 
 # Fases 3, 4 e 5
 
