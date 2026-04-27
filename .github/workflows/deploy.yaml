@@ -55,6 +55,15 @@ jobs:
         working-directory: ./backend
         run: sam build --template template.yaml
 
+      - name: Ensure SAM managed S3 bucket exists
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET_NAME="sam-deploy-${ACCOUNT_ID}-us-east-1"
+          if ! aws s3 ls "s3://${BUCKET_NAME}" 2>/dev/null; then
+            aws s3 mb "s3://${BUCKET_NAME}" --region ${{ env.AWS_REGION }}
+          fi
+          echo "sam_bucket=${BUCKET_NAME}" >> $GITHUB_ENV
+
       - name: SAM Deploy
         working-directory: ./backend
         run: |
@@ -63,7 +72,7 @@ jobs:
             --stack-name ${{ env.SAM_STACK_NAME }} \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
-            --resolve-s3 \
+            --s3-bucket ${{ env.sam_bucket }} \
             --parameter-overrides \
               "FrontendBucketName=${{ env.S3_BUCKET_PREFIX }}" \
               "Environment=prd" \
