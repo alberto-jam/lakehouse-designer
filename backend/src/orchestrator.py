@@ -2,10 +2,9 @@ import json
 import os
 import boto3
 import time
-import math
+from decimal import Decimal
 from datetime import datetime, timedelta
 from jinja2 import Template
-import urllib.parse
 
 s3_client = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
@@ -44,10 +43,10 @@ def lambda_handler(event, context):
         'user_id': user_id,
         'timestamp': timestamp,
         'ttl': ttl,
-        'input_params': body,
+        'input_params': json.loads(json.dumps(body), parse_float=Decimal),
         'output_architecture': 'full_lakehouse_with_redshift' if use_redshift else 'light_lakehouse_athena',
-        'cost_estimate': round(total_cost, 2),
-        'cost_breakdown': cost_breakdown,
+        'cost_estimate': Decimal(str(round(total_cost, 2))),
+        'cost_breakdown': {k: Decimal(str(v)) for k, v in cost_breakdown.items()},
         'template_url': template_url
     }
     table.put_item(Item=item)
