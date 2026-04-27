@@ -221,8 +221,6 @@ Resources:
             RestApiId: !Ref LakeHouseAPI
             Path: /generate-architecture
             Method: POST
-            Auth:
-              Authorizer: AWS_IAM
 
   # ==================== API GATEWAY ====================
   LakeHouseAPI:
@@ -242,7 +240,7 @@ Resources:
         AllowOrigin: "'*'"
         MaxAge: "'600'"
       Auth:
-        DefaultAuthorizer: AWS_IAM
+        DefaultAuthorizer: NONE
         AddDefaultAuthorizerToCorsPreflight: false
       GatewayResponses:
         DEFAULT_4XX:
