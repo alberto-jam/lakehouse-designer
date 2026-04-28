@@ -214,8 +214,8 @@ def compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift, re
     cost['Glue'] = round(2 * 30 * 0.44, 2)
     cost['Athena'] = round(200 * 30 * 0.005, 2)
     if use_redshift:
-        # ra3.xlplus: $1.086/h por nó
-        cost['Redshift'] = round(redshift_node_count * 1.086 * 24 * 30, 2)
+        # ra3.xlplus: $1.0833/h por nó (preço real AWS Pricing API)
+        cost['Redshift'] = round(redshift_node_count * 1.0833 * 24 * 30, 2)
         cost['QuickSight'] = 30.0
     else:
         cost['Redshift'] = 0.0
@@ -353,8 +353,7 @@ def build_usage_items(cost_breakdown, input_params):
         'S3': cost_breakdown.get('S3', 0) / 0.023 if cost_breakdown.get('S3', 0) > 0 else 0,
         'Glue': cost_breakdown.get('Glue', 0) / 0.44 if cost_breakdown.get('Glue', 0) > 0 else 0,
         'Athena': cost_breakdown.get('Athena', 0) / 5.0 if cost_breakdown.get('Athena', 0) > 0 else 0,
-        # CS = Compute Seconds, converter horas para segundos
-        'Redshift': (cost_breakdown.get('Redshift', 0) / 1.086) * 3600 if cost_breakdown.get('Redshift', 0) > 0 else 0,
+        'Redshift': (cost_breakdown.get('Redshift', 0) / 1.0833) * 3600 if cost_breakdown.get('Redshift', 0) > 0 else 0,
         'DMS': cost_breakdown.get('DMS', 0) / 0.176 if cost_breakdown.get('DMS', 0) > 0 else 0,
         'API Gateway (External)': cost_breakdown.get('API Gateway (External)', 0) / 0.0000035 if cost_breakdown.get('API Gateway (External)', 0) > 0 else 0,
         'QuickSight': max(1, cost_breakdown.get('QuickSight', 0) / 18.0) if cost_breakdown.get('QuickSight', 0) > 0 else 0,
