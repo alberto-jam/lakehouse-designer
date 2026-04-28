@@ -2,6 +2,7 @@ import type { ArchitectureOutput } from "../services/types";
 import TabelaCusto from "./TabelaCusto";
 import DiagramaMermaid from "./DiagramaMermaid";
 import BotaoDownload from "./BotaoDownload";
+import BotaoPricingCalculator from "./BotaoPricingCalculator";
 
 interface ResultadoArquiteturaProps {
   result: ArchitectureOutput;
@@ -89,6 +90,14 @@ export default function ResultadoArquitetura({ result }: ResultadoArquiteturaPro
           Template CloudFormation
         </h2>
         <BotaoDownload templateUrl={result.cloudformation_template_url} />
+      </div>
+
+      {/* AWS Pricing Calculator */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">
+          AWS Pricing Calculator
+        </h2>
+        <BotaoPricingCalculator pricingCalculatorUrl={result.pricing_calculator_url} />
       </div>
     </div>
   );

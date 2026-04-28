@@ -210,6 +210,14 @@ Resources:
         - S3CrudPolicy:
             BucketName: !Ref TemplatesBucket
         - CloudWatchLogsFullAccess
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - bcm-pricing-calculator:CreateWorkloadEstimate
+                - bcm-pricing-calculator:CreateWorkloadEstimateUsage
+              Resource:
+                - !Sub "arn:aws:bcm-pricing-calculator:*:${AWS::AccountId}:*"
       Environment:
         Variables:
           TEMPLATES_BUCKET: !Ref TemplatesBucket

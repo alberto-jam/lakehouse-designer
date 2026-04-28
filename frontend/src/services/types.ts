@@ -19,4 +19,5 @@ export interface ArchitectureOutput {
   provisioning_steps: string[];
   message: string;
   cloudformation_template_url?: string;
+  pricing_calculator_url?: string;
 }

@@ -1,16 +1,41 @@
 import json
 import os
+import logging
 import boto3
 import time
 from decimal import Decimal
 from datetime import datetime, timedelta
 from jinja2 import Template
+from botocore.config import Config
+
+logger = logging.getLogger(__name__)
 
 s3_client = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
 TABLE_NAME = os.environ['TABLE_NAME']
 TEMPLATES_BUCKET = os.environ['TEMPLATES_BUCKET']
 table = dynamodb.Table(TABLE_NAME)
+
+BCM_CLIENT_CONFIG = Config(
+    connect_timeout=5,
+    read_timeout=10,
+    retries={'max_attempts': 1}
+)
+
+ESTIMATE_URL_TEMPLATE = (
+    "https://us-east-1.console.aws.amazon.com/costmanagement/home"
+    "#/pricing-calculator/workload-estimate/{id}"
+)
+
+SERVICE_CODE_MAPPING = {
+    'S3': {'serviceCode': 'AmazonS3', 'usageType': 'TimedStorage-ByteHrs', 'operation': 'StandardStorage'},
+    'Glue': {'serviceCode': 'AWSGlue', 'usageType': 'ETL-DPU-Hour', 'operation': 'ETLJob'},
+    'Athena': {'serviceCode': 'AmazonAthena', 'usageType': 'QueryScanned-Bytes', 'operation': 'QueryExecution'},
+    'Redshift': {'serviceCode': 'AmazonRedshift', 'usageType': 'Node:ra3.xlplus', 'operation': 'RunComputeNode'},
+    'DMS': {'serviceCode': 'AWSDatabaseMigrationSvc', 'usageType': 'dms.r5.large', 'operation': 'ReplicateData'},
+    'API Gateway (External)': {'serviceCode': 'AmazonApiGateway', 'usageType': 'ApiGatewayRequest', 'operation': 'RestApiRequest'},
+    'QuickSight': {'serviceCode': 'AmazonQuickSight', 'usageType': 'User:Enterprise', 'operation': 'EnterpriseUser'},
+}
 
 
 def safe_int(value, default=0):
@@ -86,7 +111,14 @@ def lambda_handler(event, context):
     }
     table.put_item(Item=item)
 
-    # 8. Resposta final
+    # 8. Criar estimativa no AWS Pricing Calculator (não-bloqueante)
+    pricing_calculator_url = create_pricing_calculator_estimate(
+        architecture_type=item['output_architecture'],
+        cost_breakdown=cost_breakdown,
+        input_params=body
+    )
+
+    # 9. Resposta final
     response = {
         "architecture_type": item['output_architecture'],
         "services": services,
@@ -95,6 +127,7 @@ def lambda_handler(event, context):
         "diagram_mermaid": diagram,
         "provisioning_steps": get_provisioning_steps(use_redshift, dms_cdc_enabled, data_source_count, external_api_count),
         "cloudformation_template_url": template_url,
+        "pricing_calculator_url": pricing_calculator_url,
         "message": "Template CloudFormation gerado e disponível por 1 hora."
     }
 
@@ -282,3 +315,70 @@ def get_provisioning_steps(use_redshift, dms_enabled=False, source_count=0, api_
         steps.append("Configurar permissões IAM para acesso Lambda → S3/Athena")
 
     return steps
+
+
+# ==================== BCM PRICING CALCULATOR ====================
+
+def build_estimate_name(architecture_type):
+    """Gera nome do Workload Estimate compatível com a API ([a-zA-Z0-9-]+, max 64)."""
+    ts = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
+    name = f"LakeHouse-{architecture_type}-{ts}"
+    return name[:64]
+
+
+def build_estimate_url(workload_estimate_id):
+    """Constrói a URL do console AWS para o Workload Estimate."""
+    return ESTIMATE_URL_TEMPLATE.format(id=workload_estimate_id)
+
+
+def build_usage_items(cost_breakdown):
+    """Converte cost_breakdown em lista de Usage Items para a BCM API.
+    Omite serviços com custo zero ou sem mapeamento."""
+    items = []
+    for service_name, cost in cost_breakdown.items():
+        if cost <= 0:
+            continue
+        mapping = SERVICE_CODE_MAPPING.get(service_name)
+        if not mapping:
+            continue
+        items.append({
+            'serviceCode': mapping['serviceCode'],
+            'usageType': mapping['usageType'],
+            'operation': mapping['operation'],
+            'key': f"LakeHouse-{service_name.replace(' ', '-')}",
+            'amount': float(cost),
+        })
+    return items
+
+
+def create_pricing_calculator_estimate(architecture_type, cost_breakdown, input_params):
+    """Cria Workload Estimate na BCM Pricing Calculator.
+    Retorna URL do console ou None em caso de falha."""
+    try:
+        bcm_client = boto3.client(
+            'bcm-pricing-calculator',
+            region_name='us-east-1',
+            config=BCM_CLIENT_CONFIG
+        )
+        name = build_estimate_name(architecture_type)
+
+        # 1. Criar Workload Estimate
+        create_resp = bcm_client.create_workload_estimate(
+            name=name,
+            rateType='BEFORE_DISCOUNTS'
+        )
+        estimate_id = create_resp['id']
+
+        # 2. Adicionar Usage Items
+        usage_items = build_usage_items(cost_breakdown)
+        if usage_items:
+            bcm_client.batch_create_workload_estimate_usage(
+                workloadEstimateId=estimate_id,
+                usage=usage_items
+            )
+
+        return build_estimate_url(estimate_id)
+
+    except Exception as e:
+        logger.error("Falha ao criar Workload Estimate na BCM Pricing Calculator: %s", str(e))
+        return None
