@@ -224,11 +224,11 @@ def compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift):
 
 def compute_dms_cost(db_count):
     """Custo mensal de AWS DMS CDC.
-    - Instância dms.r5.large: $0.192/h × 24h × 30d = ~$138.24
+    - Instância dms.r5.large: $0.176/h × 24h × 30d = ~$126.72
     - Armazenamento logs CDC: 50GB × $0.10/GB = $5.00
     - Overhead por tarefa: ~$10/mês × db_count
     """
-    instance_cost = 0.192 * 24 * 30
+    instance_cost = 0.176 * 24 * 30
     storage_cost = 50 * 0.10
     task_cost = db_count * 10.0
     return round(instance_cost + storage_cost + task_cost, 2)
@@ -352,7 +352,7 @@ def build_usage_items(cost_breakdown, input_params):
         'Glue': cost_breakdown.get('Glue', 0) / 0.44 if cost_breakdown.get('Glue', 0) > 0 else 0,
         'Athena': cost_breakdown.get('Athena', 0) / 5.0 if cost_breakdown.get('Athena', 0) > 0 else 0,
         'Redshift': cost_breakdown.get('Redshift', 0) / 2.208 if cost_breakdown.get('Redshift', 0) > 0 else 0,
-        'DMS': cost_breakdown.get('DMS', 0) / 0.192 if cost_breakdown.get('DMS', 0) > 0 else 0,
+        'DMS': cost_breakdown.get('DMS', 0) / 0.176 if cost_breakdown.get('DMS', 0) > 0 else 0,
         'API Gateway (External)': cost_breakdown.get('API Gateway (External)', 0) / 0.0000035 if cost_breakdown.get('API Gateway (External)', 0) > 0 else 0,
         'QuickSight': max(1, cost_breakdown.get('QuickSight', 0) / 18.0) if cost_breakdown.get('QuickSight', 0) > 0 else 0,
     }
