@@ -28,13 +28,13 @@ ESTIMATE_URL_TEMPLATE = (
 )
 
 SERVICE_CODE_MAPPING = {
-    'S3': {'serviceCode': 'AmazonS3', 'usageType': 'TimedStorage-ByteHrs', 'operation': 'StandardStorage'},
-    'Glue': {'serviceCode': 'AWSGlue', 'usageType': 'ETL-DPU-Hour', 'operation': 'ETLJob'},
-    'Athena': {'serviceCode': 'AmazonAthena', 'usageType': 'QueryScanned-Bytes', 'operation': 'QueryExecution'},
-    'Redshift': {'serviceCode': 'AmazonRedshift', 'usageType': 'Node:ra3.xlplus', 'operation': 'RunComputeNode'},
-    'DMS': {'serviceCode': 'AWSDatabaseMigrationSvc', 'usageType': 'dms.r5.large', 'operation': 'ReplicateData'},
-    'API Gateway (External)': {'serviceCode': 'AmazonApiGateway', 'usageType': 'ApiGatewayRequest', 'operation': 'RestApiRequest'},
-    'QuickSight': {'serviceCode': 'AmazonQuickSight', 'usageType': 'User:Enterprise', 'operation': 'EnterpriseUser'},
+    'S3': {'serviceCode': 'AmazonS3', 'usageType': 'TimedStorage-ByteHrs', 'operation': 'StandardStorage', 'key': 'S3store'},
+    'Glue': {'serviceCode': 'AWSGlue', 'usageType': 'ETL-DPU-Hour', 'operation': 'ETLJob', 'key': 'GlueETL'},
+    'Athena': {'serviceCode': 'AmazonAthena', 'usageType': 'QueryScanned-Bytes', 'operation': 'QueryExecution', 'key': 'AthenaQry'},
+    'Redshift': {'serviceCode': 'AmazonRedshift', 'usageType': 'Node:ra3.xlplus', 'operation': 'RunComputeNode', 'key': 'RSNode'},
+    'DMS': {'serviceCode': 'AWSDatabaseMigrationSvc', 'usageType': 'dms.r5.large', 'operation': 'ReplicateData', 'key': 'DMSrepl'},
+    'API Gateway (External)': {'serviceCode': 'AmazonApiGateway', 'usageType': 'ApiGatewayRequest', 'operation': 'RestApiRequest', 'key': 'APIGWext'},
+    'QuickSight': {'serviceCode': 'AmazonQuickSight', 'usageType': 'User:Enterprise', 'operation': 'EnterpriseUser', 'key': 'QSuser'},
 }
 
 
@@ -347,7 +347,7 @@ def build_usage_items(cost_breakdown):
             'serviceCode': mapping['serviceCode'],
             'usageType': mapping['usageType'],
             'operation': mapping['operation'],
-            'key': f"LakeHouse-{service_name.replace(' ', '-')}",
+            'key': mapping['key'],
             'amount': float(cost),
             'usageAccountId': account_id,
         })
