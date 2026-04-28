@@ -10,6 +10,7 @@ import "./App.css";
 
 function App() {
   const [result, setResult] = useState<ArchitectureOutput | null>(null);
+  const [lastInput, setLastInput] = useState<ArchitectureInput | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,6 +21,7 @@ function App() {
     try {
       const output = await generateArchitecture(data);
       setResult(output);
+      setLastInput(data);
     } catch (err) {
       const message = (err as Error).message;
       setError(message);
@@ -54,7 +56,7 @@ function App() {
 
           {result && (
             <div>
-              <ResultadoArquitetura result={result} />
+              <ResultadoArquitetura result={result} lastInput={lastInput} />
             </div>
           )}
         </div>

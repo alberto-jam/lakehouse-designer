@@ -114,13 +114,16 @@ def lambda_handler(event, context):
     }
     table.put_item(Item=item)
 
-    # 8. Criar estimativa no AWS Pricing Calculator (não-bloqueante)
-    pricing_calculator_url = create_pricing_calculator_estimate(
-        architecture_type=item['output_architecture'],
-        cost_breakdown=cost_breakdown,
-        input_params=body,
-        prices=prices
-    )
+    # 8. Criar estimativa no AWS Pricing Calculator (somente se solicitado)
+    create_estimate = body.get('create_estimate', False)
+    pricing_calculator_url = None
+    if create_estimate:
+        pricing_calculator_url = create_pricing_calculator_estimate(
+            architecture_type=item['output_architecture'],
+            cost_breakdown=cost_breakdown,
+            input_params=body,
+            prices=prices
+        )
 
     # 9. Resposta final
     response = {

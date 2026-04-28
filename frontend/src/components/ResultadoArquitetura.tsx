@@ -1,4 +1,4 @@
-import type { ArchitectureOutput } from "../services/types";
+import type { ArchitectureOutput, ArchitectureInput } from "../services/types";
 import TabelaCusto from "./TabelaCusto";
 import DiagramaMermaid from "./DiagramaMermaid";
 import BotaoDownload from "./BotaoDownload";
@@ -6,6 +6,7 @@ import BotaoPricingCalculator from "./BotaoPricingCalculator";
 
 interface ResultadoArquiteturaProps {
   result: ArchitectureOutput;
+  lastInput?: ArchitectureInput | null;
 }
 
 const ARCH_LABELS: Record<string, string> = {
@@ -17,7 +18,7 @@ function formatArchType(type: string): string {
   return ARCH_LABELS[type] ?? type;
 }
 
-export default function ResultadoArquitetura({ result }: ResultadoArquiteturaProps) {
+export default function ResultadoArquitetura({ result, lastInput }: ResultadoArquiteturaProps) {
   return (
     <div className="space-y-6">
       {/* Architecture type */}
@@ -97,7 +98,10 @@ export default function ResultadoArquitetura({ result }: ResultadoArquiteturaPro
         <h2 className="text-lg font-semibold text-gray-800 mb-2">
           AWS Pricing Calculator
         </h2>
-        <BotaoPricingCalculator pricingCalculatorUrl={result.pricing_calculator_url} />
+        <BotaoPricingCalculator
+          lastInput={lastInput}
+          pricingCalculatorUrl={result.pricing_calculator_url}
+        />
       </div>
     </div>
   );
