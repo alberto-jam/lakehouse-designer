@@ -335,6 +335,7 @@ def build_estimate_url(workload_estimate_id):
 def build_usage_items(cost_breakdown):
     """Converte cost_breakdown em lista de Usage Items para a BCM API.
     Omite serviços com custo zero ou sem mapeamento."""
+    account_id = boto3.client('sts').get_caller_identity()['Account']
     items = []
     for service_name, cost in cost_breakdown.items():
         if cost <= 0:
@@ -348,6 +349,7 @@ def build_usage_items(cost_breakdown):
             'operation': mapping['operation'],
             'key': f"LakeHouse-{service_name.replace(' ', '-')}",
             'amount': float(cost),
+            'usageAccountId': account_id,
         })
     return items
 
