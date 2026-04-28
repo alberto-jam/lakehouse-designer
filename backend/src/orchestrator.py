@@ -332,10 +332,30 @@ def build_estimate_url(workload_estimate_id):
     return ESTIMATE_URL_TEMPLATE.format(id=workload_estimate_id)
 
 
-def build_usage_items(cost_breakdown):
+def build_usage_items(cost_breakdown, input_params):
     """Converte cost_breakdown em lista de Usage Items para a BCM API.
+    Calcula quantidades de uso reais (não custos em USD).
     Omite serviços com custo zero ou sem mapeamento."""
     account_id = boto3.client('sts').get_caller_identity()['Account']
+
+    # Calcular quantidades de uso mensais por serviço
+    volume_tb = input_params.get('data_volume_tb', 0)
+    records_millions = input_params.get('records_per_day_millions', 0)
+    data_source_count = max(int(input_params.get('data_source_count', 0)), 0)
+    dms_db_count = max(int(input_params.get('dms_cdc_db_count', 0)), 0)
+    api_count = max(int(input_params.get('external_api_count', 0)), 0)
+
+    # Mapa de quantidades: serviço → amount na unidade correta
+    usage_amounts = {
+        'S3': volume_tb * 1024,                          # GB-Month de storage
+        'Glue': (2 + data_source_count) * 30,            # DPU-Hours/mês (base + fontes)
+        'Athena': 30,                                     # TB scanned/mês (estimativa)
+        'Redshift': 2 * 24 * 30,                          # Node-Hours/mês (2 nós × 24h × 30d)
+        'DMS': dms_db_count * 24 * 30 if dms_db_count > 0 else 0,  # Instance-Hours/mês
+        'API Gateway (External)': api_count * 1_000_000 if api_count > 0 else 0,  # Requests/mês
+        'QuickSight': 1,                                  # Users
+    }
+
     items = []
     for service_name, cost in cost_breakdown.items():
         if cost <= 0:
@@ -343,12 +363,15 @@ def build_usage_items(cost_breakdown):
         mapping = SERVICE_CODE_MAPPING.get(service_name)
         if not mapping:
             continue
+        amount = usage_amounts.get(service_name, 0)
+        if amount <= 0:
+            continue
         items.append({
             'serviceCode': mapping['serviceCode'],
             'usageType': mapping['usageType'],
             'operation': mapping['operation'],
             'key': mapping['key'],
-            'amount': float(cost),
+            'amount': float(amount),
             'usageAccountId': account_id,
         })
     return items
@@ -373,7 +396,7 @@ def create_pricing_calculator_estimate(architecture_type, cost_breakdown, input_
         estimate_id = create_resp['id']
 
         # 2. Adicionar Usage Items (um por vez para identificar erros)
-        usage_items = build_usage_items(cost_breakdown)
+        usage_items = build_usage_items(cost_breakdown, input_params)
         if usage_items:
             resp = bcm_client.batch_create_workload_estimate_usage(
                 workloadEstimateId=estimate_id,
