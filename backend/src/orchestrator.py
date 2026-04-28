@@ -322,7 +322,8 @@ def get_provisioning_steps(use_redshift, dms_enabled=False, source_count=0, api_
 def build_estimate_name(architecture_type):
     """Gera nome do Workload Estimate compatível com a API ([a-zA-Z0-9-]+, max 64)."""
     ts = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
-    name = f"LakeHouse-{architecture_type}-{ts}"
+    safe_type = architecture_type.replace("_", "-")
+    name = f"LakeHouse-{safe_type}-{ts}"
     return name[:64]
 
 
