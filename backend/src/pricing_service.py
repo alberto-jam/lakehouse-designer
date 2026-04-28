@@ -38,8 +38,9 @@ PRICING_CONFIG: dict = {
     's3': {
         'ServiceCode': 'AmazonS3',
         'filters': [
-            {'Type': 'TERM_MATCH', 'Field': 'usagetype', 'Value': 'USE1-TimedStorage-ByteHrs'},
+            {'Type': 'TERM_MATCH', 'Field': 'usagetype', 'Value': 'TimedStorage-ByteHrs'},
             {'Type': 'TERM_MATCH', 'Field': 'location', 'Value': 'US East (N. Virginia)'},
+            {'Type': 'TERM_MATCH', 'Field': 'volumeType', 'Value': 'Standard'},
         ],
     },
     'glue': {
@@ -80,7 +81,7 @@ PRICING_CONFIG: dict = {
     'quicksight': {
         'ServiceCode': 'AmazonQuickSight',
         'filters': [
-            {'Type': 'TERM_MATCH', 'Field': 'usagetype', 'Value': 'USE1-User:Enterprise'},
+            {'Type': 'TERM_MATCH', 'Field': 'usagetype', 'Value': 'USE1-Reader-Enterprise-Month'},
             {'Type': 'TERM_MATCH', 'Field': 'location', 'Value': 'US East (N. Virginia)'},
         ],
     },

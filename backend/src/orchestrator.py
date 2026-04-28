@@ -29,13 +29,13 @@ ESTIMATE_URL_TEMPLATE = (
 )
 
 SERVICE_CODE_MAPPING = {
-    'S3': {'serviceCode': 'AmazonS3', 'usageType': 'USE1-TimedStorage-ByteHrs', 'operation': 'StandardStorage', 'key': 'S3store'},
+    'S3': {'serviceCode': 'AmazonS3', 'usageType': 'TimedStorage-ByteHrs', 'operation': '', 'key': 'S3store'},
     'Glue': {'serviceCode': 'AWSGlue', 'usageType': 'USE1-Crawler-DPU-Hour', 'operation': 'CrawlerRun', 'key': 'GlueETL'},
     'Athena': {'serviceCode': 'AmazonAthena', 'usageType': 'USE1-DataScannedInTB', 'operation': '', 'key': 'AthenaQry'},
     'Redshift': {'serviceCode': 'AmazonRedshift', 'usageType': 'CS:ra3.xlplus', 'operation': '', 'key': 'RSNode'},
     'DMS': {'serviceCode': 'AWSDatabaseMigrationSvc', 'usageType': 'InstanceUsg:dms.r5.large', 'operation': 'CreateDMSInstance', 'key': 'DMSrepl'},
     'API Gateway (External)': {'serviceCode': 'AmazonApiGateway', 'usageType': 'USE1-ApiGatewayRequest', 'operation': 'ApiGatewayRequest', 'key': 'APIGWext'},
-    'QuickSight': {'serviceCode': 'AmazonQuickSight', 'usageType': 'USE1-User:Enterprise', 'operation': 'EnterpriseUser', 'key': 'QSuser'},
+    'QuickSight': {'serviceCode': 'AmazonQuickSight', 'usageType': 'USE1-Reader-Enterprise-Month', 'operation': '', 'key': 'QSuser'},
 }
 
 
