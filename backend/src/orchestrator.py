@@ -29,11 +29,11 @@ ESTIMATE_URL_TEMPLATE = (
 
 SERVICE_CODE_MAPPING = {
     'S3': {'serviceCode': 'AmazonS3', 'usageType': 'USE1-TimedStorage-ByteHrs', 'operation': 'StandardStorage', 'key': 'S3store'},
-    'Glue': {'serviceCode': 'AWSGlue', 'usageType': 'USE1-GlueETL-DPU-Hour', 'operation': 'GlueETL', 'key': 'GlueETL'},
-    'Athena': {'serviceCode': 'AmazonAthena', 'usageType': 'USE1-DataScanned', 'operation': 'QueryExecution', 'key': 'AthenaQry'},
+    'Glue': {'serviceCode': 'AWSGlue', 'usageType': 'USE1-Crawler-DPU-Hour', 'operation': 'CrawlerRun', 'key': 'GlueETL'},
+    'Athena': {'serviceCode': 'AmazonAthena', 'usageType': 'USE1-DataScannedInTB', 'operation': '', 'key': 'AthenaQry'},
     'Redshift': {'serviceCode': 'AmazonRedshift', 'usageType': 'USE1-Node:ra3.xlplus', 'operation': 'RunComputeNode:ra3.xlplus', 'key': 'RSNode'},
-    'DMS': {'serviceCode': 'AWSDatabaseMigrationSvc', 'usageType': 'USE1-InstanceUsg:dms.r5.large', 'operation': 'CreateReplicationInstance', 'key': 'DMSrepl'},
-    'API Gateway (External)': {'serviceCode': 'AmazonApiGateway', 'usageType': 'USE1-ApiGatewayRequest', 'operation': 'ApiGatewayHttpRequest', 'key': 'APIGWext'},
+    'DMS': {'serviceCode': 'AWSDatabaseMigrationSvc', 'usageType': 'InstanceUsg:dms.r5.large', 'operation': 'CreateDMSInstance', 'key': 'DMSrepl'},
+    'API Gateway (External)': {'serviceCode': 'AmazonApiGateway', 'usageType': 'USE1-ApiGatewayRequest', 'operation': 'ApiGatewayRequest', 'key': 'APIGWext'},
     'QuickSight': {'serviceCode': 'AmazonQuickSight', 'usageType': 'USE1-User:Enterprise', 'operation': 'EnterpriseUser', 'key': 'QSuser'},
 }
 
