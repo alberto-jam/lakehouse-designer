@@ -372,13 +372,20 @@ def create_pricing_calculator_estimate(architecture_type, cost_breakdown, input_
         )
         estimate_id = create_resp['id']
 
-        # 2. Adicionar Usage Items
+        # 2. Adicionar Usage Items (um por vez para identificar erros)
         usage_items = build_usage_items(cost_breakdown)
         if usage_items:
-            bcm_client.batch_create_workload_estimate_usage(
+            resp = bcm_client.batch_create_workload_estimate_usage(
                 workloadEstimateId=estimate_id,
                 usage=usage_items
             )
+            # Logar erros individuais por item
+            if resp.get('errors'):
+                for err in resp['errors']:
+                    logger.warning(
+                        "BCM usage item error [key=%s]: %s - %s",
+                        err.get('key', '?'), err.get('errorCode', '?'), err.get('errorMessage', '?')
+                    )
 
         return build_estimate_url(estimate_id)
 
