@@ -22,7 +22,18 @@ FALLBACK_PRICES: dict = {
     'quicksight': 18.0,
 }
 
-# Mapeamento de serviços para filtros da Pricing API
+# Fatores de normalização: converte preço da API para a unidade que o app usa
+# API retorna: S3=$/GB-mês, Glue=$/DPU-h, Athena=$/TB, Redshift=$/segundo, DMS=$/h, APIGW=$/request, QS=$/user-mês
+# App espera: S3=$/GB-mês, Glue=$/DPU-h, Athena=$/TB, Redshift=$/hora, DMS=$/h, APIGW=$/milhão, QS=$/user-mês
+PRICE_NORMALIZERS: dict = {
+    's3': 1.0,
+    'glue': 1.0,
+    'athena': 1.0,
+    'redshift': 3600.0,       # $/segundo → $/hora (×3600)
+    'dms': 1.0,
+    'api_gateway': 1_000_000,  # $/request → $/milhão (×1M)
+    'quicksight': 1.0,
+}
 PRICING_CONFIG: dict = {
     's3': {
         'ServiceCode': 'AmazonS3',
@@ -122,7 +133,11 @@ def load_all_prices():
         for future in as_completed(futures):
             service_key, price = future.result()
             if price is not None:
-                prices[service_key] = price
+                # Normalizar para a unidade que o app espera
+                normalizer = PRICE_NORMALIZERS.get(service_key, 1.0)
+                prices[service_key] = price * normalizer
+                logger.debug("Preço dinâmico %s: API=%.10f × normalizer=%.0f = %.6f",
+                             service_key, price, normalizer, prices[service_key])
             else:
                 fallback_services.append(service_key)
 

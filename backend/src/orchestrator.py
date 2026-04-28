@@ -375,7 +375,7 @@ def build_usage_items(cost_breakdown, input_params, prices=None):
         'Athena': cost_breakdown.get('Athena', 0) / safe_divisor('athena') if cost_breakdown.get('Athena', 0) > 0 else 0,
         'Redshift': (cost_breakdown.get('Redshift', 0) / safe_divisor('redshift')) * 3600 if cost_breakdown.get('Redshift', 0) > 0 else 0,
         'DMS': cost_breakdown.get('DMS', 0) / safe_divisor('dms') if cost_breakdown.get('DMS', 0) > 0 else 0,
-        'API Gateway (External)': cost_breakdown.get('API Gateway (External)', 0) / (safe_divisor('api_gateway') / 1_000_000) if cost_breakdown.get('API Gateway (External)', 0) > 0 else 0,
+        'API Gateway (External)': cost_breakdown.get('API Gateway (External)', 0) / safe_divisor('api_gateway') * 1_000_000 if cost_breakdown.get('API Gateway (External)', 0) > 0 else 0,
         'QuickSight': max(1, cost_breakdown.get('QuickSight', 0) / safe_divisor('quicksight')) if cost_breakdown.get('QuickSight', 0) > 0 else 0,
     }
 
