@@ -31,7 +31,7 @@ SERVICE_CODE_MAPPING = {
     'S3': {'serviceCode': 'AmazonS3', 'usageType': 'USE1-TimedStorage-ByteHrs', 'operation': 'StandardStorage', 'key': 'S3store'},
     'Glue': {'serviceCode': 'AWSGlue', 'usageType': 'USE1-Crawler-DPU-Hour', 'operation': 'CrawlerRun', 'key': 'GlueETL'},
     'Athena': {'serviceCode': 'AmazonAthena', 'usageType': 'USE1-DataScannedInTB', 'operation': '', 'key': 'AthenaQry'},
-    'Redshift': {'serviceCode': 'AmazonRedshift', 'usageType': 'USE1-Node:ra3.xlplus', 'operation': 'RunComputeNode:ra3.xlplus', 'key': 'RSNode'},
+    'Redshift': {'serviceCode': 'AmazonRedshift', 'usageType': 'Node:ra3.xlplus', 'operation': 'RunComputeNode:ra3.xlplus', 'key': 'RSNode'},
     'DMS': {'serviceCode': 'AWSDatabaseMigrationSvc', 'usageType': 'InstanceUsg:dms.r5.large', 'operation': 'CreateDMSInstance', 'key': 'DMSrepl'},
     'API Gateway (External)': {'serviceCode': 'AmazonApiGateway', 'usageType': 'USE1-ApiGatewayRequest', 'operation': 'ApiGatewayRequest', 'key': 'APIGWext'},
     'QuickSight': {'serviceCode': 'AmazonQuickSight', 'usageType': 'USE1-User:Enterprise', 'operation': 'EnterpriseUser', 'key': 'QSuser'},
@@ -61,6 +61,7 @@ def lambda_handler(event, context):
     dms_cdc_db_count = safe_int(body.get('dms_cdc_db_count', 0)) if dms_cdc_enabled else 0
     data_source_count = safe_int(body.get('data_source_count', 0))
     external_api_count = safe_int(body.get('external_api_count', 0))
+    redshift_node_count = max(safe_int(body.get('redshift_node_count', 2)), 2)
 
     # 2. Decisão
     use_redshift = (volume_tb > 10 or
@@ -70,7 +71,7 @@ def lambda_handler(event, context):
     template_url = generate_cloudformation_template(use_redshift, volume_tb, user_id)
 
     # 4. Estimativa de custo
-    cost_breakdown = compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift)
+    cost_breakdown = compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift, redshift_node_count)
 
     # Custos condicionais dos novos serviços
     if dms_cdc_enabled and dms_cdc_db_count > 0:
@@ -207,13 +208,14 @@ Resources:
 """
 
 
-def compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift):
+def compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift, redshift_node_count=2):
     cost = {}
     cost['S3'] = round(volume_tb * 1024 * 0.023 + (records_per_day_millions * 1e6 * 30) * 0.0000004, 2)
     cost['Glue'] = round(2 * 30 * 0.44, 2)
     cost['Athena'] = round(200 * 30 * 0.005, 2)
     if use_redshift:
-        cost['Redshift'] = round(2 * 2.208 * 24 * 30, 2)
+        # ra3.xlplus: $1.086/h por nó
+        cost['Redshift'] = round(redshift_node_count * 1.086 * 24 * 30, 2)
         cost['QuickSight'] = 30.0
     else:
         cost['Redshift'] = 0.0
@@ -351,7 +353,7 @@ def build_usage_items(cost_breakdown, input_params):
         'S3': cost_breakdown.get('S3', 0) / 0.023 if cost_breakdown.get('S3', 0) > 0 else 0,
         'Glue': cost_breakdown.get('Glue', 0) / 0.44 if cost_breakdown.get('Glue', 0) > 0 else 0,
         'Athena': cost_breakdown.get('Athena', 0) / 5.0 if cost_breakdown.get('Athena', 0) > 0 else 0,
-        'Redshift': cost_breakdown.get('Redshift', 0) / 2.208 if cost_breakdown.get('Redshift', 0) > 0 else 0,
+        'Redshift': cost_breakdown.get('Redshift', 0) / 1.086 if cost_breakdown.get('Redshift', 0) > 0 else 0,
         'DMS': cost_breakdown.get('DMS', 0) / 0.176 if cost_breakdown.get('DMS', 0) > 0 else 0,
         'API Gateway (External)': cost_breakdown.get('API Gateway (External)', 0) / 0.0000035 if cost_breakdown.get('API Gateway (External)', 0) > 0 else 0,
         'QuickSight': max(1, cost_breakdown.get('QuickSight', 0) / 18.0) if cost_breakdown.get('QuickSight', 0) > 0 else 0,

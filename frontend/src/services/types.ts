@@ -8,6 +8,7 @@ export interface ArchitectureInput {
   dms_cdc_db_count?: number;
   data_source_count: number;
   external_api_count: number;
+  redshift_node_count?: number;
 }
 
 export interface ArchitectureOutput {

@@ -16,6 +16,7 @@ interface FormState {
   dms_cdc_db_count: string;
   data_source_count: string;
   external_api_count: string;
+  redshift_node_count: string;
 }
 
 const INITIAL: FormState = {
@@ -28,6 +29,7 @@ const INITIAL: FormState = {
   dms_cdc_db_count: "",
   data_source_count: "0",
   external_api_count: "0",
+  redshift_node_count: "2",
 };
 
 export default function Formulario({ onSubmit, loading }: FormularioProps) {
@@ -92,6 +94,7 @@ export default function Formulario({ onSubmit, loading }: FormularioProps) {
       ...(form.dms_cdc_enabled && { dms_cdc_db_count: Number(form.dms_cdc_db_count) }),
       data_source_count: Number(form.data_source_count) || 0,
       external_api_count: Number(form.external_api_count) || 0,
+      redshift_node_count: Number(form.redshift_node_count) || 2,
     });
   };
 
@@ -195,6 +198,15 @@ export default function Formulario({ onSubmit, loading }: FormularioProps) {
           <input type="number" step="1" min="0" value={form.external_api_count}
             onChange={(e) => set("external_api_count", e.target.value)} className={inputClass} />
           {errors.external_api_count && <p className="text-red-600 text-xs mt-1">{errors.external_api_count}</p>}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nós Redshift (ra3.xlplus)
+          </label>
+          <input type="number" step="1" min="2" value={form.redshift_node_count}
+            onChange={(e) => set("redshift_node_count", e.target.value)} className={inputClass} />
+          <p className="text-gray-400 text-xs mt-1">Usado quando a arquitetura inclui Redshift (mín. 2)</p>
         </div>
       </div>
 
