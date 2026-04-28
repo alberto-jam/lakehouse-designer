@@ -306,12 +306,12 @@ def get_mermaid_diagram(use_redshift, dms_enabled=False, source_count=0, api_cou
 
 def get_provisioning_steps(use_redshift, dms_enabled=False, source_count=0, api_count=0):
     steps = [
-        "1. Fazer upload do template CloudFormation no console AWS ou via CLI",
-        "2. Executar `aws cloudformation create-stack --stack-name lakehouse-designer --template-body file://template.yaml`",
-        "3. Após criação, configurar Lake Formation com permissões"
+        "Fazer upload do template CloudFormation no console AWS ou via CLI",
+        "Executar `aws cloudformation create-stack --stack-name lakehouse-designer --template-body file://template.yaml`",
+        "Após criação, configurar Lake Formation com permissões"
     ]
     if use_redshift:
-        steps.insert(1, "1b. Verificar cotas de Redshift no console (limite de nós)")
+        steps.insert(1, "Verificar cotas de Redshift no console (limite de nós)")
 
     if dms_enabled:
         steps.append("Configurar instância de replicação DMS (dms.r5.large)")
