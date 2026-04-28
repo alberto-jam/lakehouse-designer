@@ -345,15 +345,16 @@ def build_usage_items(cost_breakdown, input_params):
     dms_db_count = max(int(input_params.get('dms_cdc_db_count', 0)), 0)
     api_count = max(int(input_params.get('external_api_count', 0)), 0)
 
-    # Mapa de quantidades: serviço → amount na unidade correta
+    # Quantidades calculadas a partir do custo do app / preço unitário AWS
+    # Isso garante que Calculator × preço ≈ custo do app
     usage_amounts = {
-        'S3': volume_tb * 1024,                          # GB-Month de storage
-        'Glue': (2 + data_source_count) * 30,            # DPU-Hours/mês (base + fontes)
-        'Athena': 30,                                     # TB scanned/mês (estimativa)
-        'Redshift': 2 * 24 * 30,                          # Node-Hours/mês (2 nós × 24h × 30d)
-        'DMS': dms_db_count * 24 * 30 if dms_db_count > 0 else 0,  # Instance-Hours/mês
-        'API Gateway (External)': api_count * 1_000_000 if api_count > 0 else 0,  # Requests/mês
-        'QuickSight': 1,                                  # Users
+        'S3': cost_breakdown.get('S3', 0) / 0.023 if cost_breakdown.get('S3', 0) > 0 else 0,
+        'Glue': cost_breakdown.get('Glue', 0) / 0.44 if cost_breakdown.get('Glue', 0) > 0 else 0,
+        'Athena': cost_breakdown.get('Athena', 0) / 5.0 if cost_breakdown.get('Athena', 0) > 0 else 0,
+        'Redshift': cost_breakdown.get('Redshift', 0) / 2.208 if cost_breakdown.get('Redshift', 0) > 0 else 0,
+        'DMS': cost_breakdown.get('DMS', 0) / 0.192 if cost_breakdown.get('DMS', 0) > 0 else 0,
+        'API Gateway (External)': cost_breakdown.get('API Gateway (External)', 0) / 0.0000035 if cost_breakdown.get('API Gateway (External)', 0) > 0 else 0,
+        'QuickSight': max(1, cost_breakdown.get('QuickSight', 0) / 18.0) if cost_breakdown.get('QuickSight', 0) > 0 else 0,
     }
 
     items = []
