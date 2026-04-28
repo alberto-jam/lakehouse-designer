@@ -24,7 +24,7 @@ BCM_CLIENT_CONFIG = Config(
 
 ESTIMATE_URL_TEMPLATE = (
     "https://us-east-1.console.aws.amazon.com/costmanagement/home"
-    "#/pricing-calculator/workload-estimate/{id}"
+    "?region=us-east-1#/pricing-calculator/workload-estimate/{id}"
 )
 
 SERVICE_CODE_MAPPING = {
