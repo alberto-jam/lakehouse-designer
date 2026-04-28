@@ -218,6 +218,13 @@ Resources:
                 - bcm-pricing-calculator:CreateWorkloadEstimateUsage
               Resource:
                 - !Sub "arn:aws:bcm-pricing-calculator:*:${AWS::AccountId}:*"
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - pricing:GetProducts
+                - pricing:DescribeServices
+              Resource: "*"
       Environment:
         Variables:
           TEMPLATES_BUCKET: !Ref TemplatesBucket

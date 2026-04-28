@@ -7,6 +7,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 from jinja2 import Template
 from botocore.config import Config
+from pricing_service import get_prices, FALLBACK_PRICES
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +72,18 @@ def lambda_handler(event, context):
     template_url = generate_cloudformation_template(use_redshift, volume_tb, user_id)
 
     # 4. Estimativa de custo
-    cost_breakdown = compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift, redshift_node_count)
+    prices = get_prices()
+    cost_breakdown = compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift, redshift_node_count, prices)
 
     # Custos condicionais dos novos serviços
     if dms_cdc_enabled and dms_cdc_db_count > 0:
-        cost_breakdown['DMS'] = compute_dms_cost(dms_cdc_db_count)
+        cost_breakdown['DMS'] = compute_dms_cost(dms_cdc_db_count, prices)
 
     if data_source_count > 0:
-        cost_breakdown['Glue'] = round(cost_breakdown.get('Glue', 0) + compute_additional_glue_cost(data_source_count), 2)
+        cost_breakdown['Glue'] = round(cost_breakdown.get('Glue', 0) + compute_additional_glue_cost(data_source_count, prices), 2)
 
     if external_api_count > 0:
-        cost_breakdown['API Gateway (External)'] = compute_external_api_cost(external_api_count)
+        cost_breakdown['API Gateway (External)'] = compute_external_api_cost(external_api_count, prices)
 
     total_cost = sum(cost_breakdown.values())
 
@@ -116,7 +118,8 @@ def lambda_handler(event, context):
     pricing_calculator_url = create_pricing_calculator_estimate(
         architecture_type=item['output_architecture'],
         cost_breakdown=cost_breakdown,
-        input_params=body
+        input_params=body,
+        prices=prices
     )
 
     # 9. Resposta final
@@ -208,15 +211,17 @@ Resources:
 """
 
 
-def compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift, redshift_node_count=2):
+def compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift, redshift_node_count=2, prices=None):
+    if prices is None:
+        prices = FALLBACK_PRICES
+
     cost = {}
-    cost['S3'] = round(volume_tb * 1024 * 0.023 + (records_per_day_millions * 1e6 * 30) * 0.0000004, 2)
-    cost['Glue'] = round(2 * 30 * 0.44, 2)
-    cost['Athena'] = round(200 * 30 * 0.005, 2)
+    cost['S3'] = round(volume_tb * 1024 * prices['s3'] + (records_per_day_millions * 1e6 * 30) * 0.0000004, 2)
+    cost['Glue'] = round(2 * 30 * prices['glue'], 2)
+    cost['Athena'] = round(200 * 30 * (prices['athena'] / 1000), 2)
     if use_redshift:
-        # ra3.xlplus: $1.0833/h por nó (preço real AWS Pricing API)
-        cost['Redshift'] = round(redshift_node_count * 1.0833 * 24 * 30, 2)
-        cost['QuickSight'] = 30.0
+        cost['Redshift'] = round(redshift_node_count * prices['redshift'] * 24 * 30, 2)
+        cost['QuickSight'] = round(prices['quicksight'], 2)
     else:
         cost['Redshift'] = 0.0
         cost['QuickSight'] = 0.0
@@ -224,40 +229,47 @@ def compute_cost_breakdown(volume_tb, records_per_day_millions, use_redshift, re
     return cost
 
 
-def compute_dms_cost(db_count):
+def compute_dms_cost(db_count, prices=None):
     """Custo mensal de AWS DMS CDC.
-    - Instância dms.r5.large: $0.176/h × 24h × 30d = ~$126.72
+    - Instância dms.r5.large: preço dinâmico × 24h × 30d
     - Armazenamento logs CDC: 50GB × $0.10/GB = $5.00
     - Overhead por tarefa: ~$10/mês × db_count
     """
-    instance_cost = 0.176 * 24 * 30
+    if prices is None:
+        prices = FALLBACK_PRICES
+
+    instance_cost = prices['dms'] * 24 * 30
     storage_cost = 50 * 0.10
     task_cost = db_count * 10.0
     return round(instance_cost + storage_cost + task_cost, 2)
 
 
-def compute_additional_glue_cost(source_count):
+def compute_additional_glue_cost(source_count, prices=None):
     """Custo adicional de Glue por fonte de coleta automatizada.
     Por fonte:
-    - Crawler: 2 DPU × 0.5h × $0.44 × 1 exec/dia × 30d = $13.20
-    - Job: 2 DPU × 1h × $0.44 × 1 exec/dia × 30d = $26.40
-    Total por fonte: ~$39.60/mês
+    - Crawler: 2 DPU × 0.5h × preço dinâmico × 1 exec/dia × 30d
+    - Job: 2 DPU × 1h × preço dinâmico × 1 exec/dia × 30d
     """
-    crawler_cost = 2 * 0.5 * 0.44 * 1 * 30
-    job_cost = 2 * 1.0 * 0.44 * 1 * 30
+    if prices is None:
+        prices = FALLBACK_PRICES
+
+    crawler_cost = 2 * 0.5 * prices['glue'] * 1 * 30
+    job_cost = 2 * 1.0 * prices['glue'] * 1 * 30
     return round(source_count * (crawler_cost + job_cost), 2)
 
 
-def compute_external_api_cost(api_count):
+def compute_external_api_cost(api_count, prices=None):
     """Custo mensal de APIs externas (API Gateway + Lambda + Data Transfer).
     Por API (premissa: 1M req/mês):
-    - API Gateway: $3.50/1M req
+    - API Gateway: preço dinâmico/1M req
     - Lambda invocações: $0.20/1M
     - Lambda compute (128MB, 200ms): ~$0.42/1M
     - Data Transfer Out: 10GB × $0.09/GB = $0.90
-    Total por API: ~$5.02/mês
     """
-    api_gw = 3.50
+    if prices is None:
+        prices = FALLBACK_PRICES
+
+    api_gw = prices['api_gateway']
     lambda_invocations = 0.20
     lambda_compute = 1_000_000 * 0.125 * 0.2 * 0.0000166667
     data_transfer = 10 * 0.09
@@ -334,10 +346,13 @@ def build_estimate_url(workload_estimate_id):
     return ESTIMATE_URL_TEMPLATE.format(id=workload_estimate_id)
 
 
-def build_usage_items(cost_breakdown, input_params):
+def build_usage_items(cost_breakdown, input_params, prices=None):
     """Converte cost_breakdown em lista de Usage Items para a BCM API.
     Calcula quantidades de uso reais (não custos em USD).
     Omite serviços com custo zero ou sem mapeamento."""
+    if prices is None:
+        prices = FALLBACK_PRICES
+
     account_id = boto3.client('sts').get_caller_identity()['Account']
 
     # Calcular quantidades de uso mensais por serviço
@@ -347,16 +362,21 @@ def build_usage_items(cost_breakdown, input_params):
     dms_db_count = max(int(input_params.get('dms_cdc_db_count', 0)), 0)
     api_count = max(int(input_params.get('external_api_count', 0)), 0)
 
+    # Divisores dinâmicos com proteção contra divisão por zero
+    def safe_divisor(key):
+        p = prices.get(key, 0)
+        return p if p > 0 else FALLBACK_PRICES[key]
+
     # Quantidades calculadas a partir do custo do app / preço unitário AWS
     # Isso garante que Calculator × preço ≈ custo do app
     usage_amounts = {
-        'S3': cost_breakdown.get('S3', 0) / 0.023 if cost_breakdown.get('S3', 0) > 0 else 0,
-        'Glue': cost_breakdown.get('Glue', 0) / 0.44 if cost_breakdown.get('Glue', 0) > 0 else 0,
-        'Athena': cost_breakdown.get('Athena', 0) / 5.0 if cost_breakdown.get('Athena', 0) > 0 else 0,
-        'Redshift': (cost_breakdown.get('Redshift', 0) / 1.0833) * 3600 if cost_breakdown.get('Redshift', 0) > 0 else 0,
-        'DMS': cost_breakdown.get('DMS', 0) / 0.176 if cost_breakdown.get('DMS', 0) > 0 else 0,
-        'API Gateway (External)': cost_breakdown.get('API Gateway (External)', 0) / 0.0000035 if cost_breakdown.get('API Gateway (External)', 0) > 0 else 0,
-        'QuickSight': max(1, cost_breakdown.get('QuickSight', 0) / 18.0) if cost_breakdown.get('QuickSight', 0) > 0 else 0,
+        'S3': cost_breakdown.get('S3', 0) / safe_divisor('s3') if cost_breakdown.get('S3', 0) > 0 else 0,
+        'Glue': cost_breakdown.get('Glue', 0) / safe_divisor('glue') if cost_breakdown.get('Glue', 0) > 0 else 0,
+        'Athena': cost_breakdown.get('Athena', 0) / safe_divisor('athena') if cost_breakdown.get('Athena', 0) > 0 else 0,
+        'Redshift': (cost_breakdown.get('Redshift', 0) / safe_divisor('redshift')) * 3600 if cost_breakdown.get('Redshift', 0) > 0 else 0,
+        'DMS': cost_breakdown.get('DMS', 0) / safe_divisor('dms') if cost_breakdown.get('DMS', 0) > 0 else 0,
+        'API Gateway (External)': cost_breakdown.get('API Gateway (External)', 0) / (safe_divisor('api_gateway') / 1_000_000) if cost_breakdown.get('API Gateway (External)', 0) > 0 else 0,
+        'QuickSight': max(1, cost_breakdown.get('QuickSight', 0) / safe_divisor('quicksight')) if cost_breakdown.get('QuickSight', 0) > 0 else 0,
     }
 
     items = []
@@ -380,7 +400,7 @@ def build_usage_items(cost_breakdown, input_params):
     return items
 
 
-def create_pricing_calculator_estimate(architecture_type, cost_breakdown, input_params):
+def create_pricing_calculator_estimate(architecture_type, cost_breakdown, input_params, prices=None):
     """Cria Workload Estimate na BCM Pricing Calculator.
     Retorna URL do console ou None em caso de falha."""
     try:
@@ -399,7 +419,7 @@ def create_pricing_calculator_estimate(architecture_type, cost_breakdown, input_
         estimate_id = create_resp['id']
 
         # 2. Adicionar Usage Items (um por vez para identificar erros)
-        usage_items = build_usage_items(cost_breakdown, input_params)
+        usage_items = build_usage_items(cost_breakdown, input_params, prices)
         if usage_items:
             resp = bcm_client.batch_create_workload_estimate_usage(
                 workloadEstimateId=estimate_id,
