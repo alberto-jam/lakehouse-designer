@@ -34,3 +34,5 @@ npm-debug.log*
 __pycache__/
 *.pyc
 .pytest_cache/
+datalake-designer-admin_accessKeys.csv
+aws-sam-cli-linux-x86_64.zip
