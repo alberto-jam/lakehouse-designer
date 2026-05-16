@@ -1,5 +1,6 @@
-import { Suspense, useCallback, useRef } from 'react';
+import { Suspense, useCallback, useMemo, useRef } from 'react';
 import { useWizardState } from '../../hooks/useWizardState';
+import { assemblePayload } from '../../hooks/useGenerateV2';
 import { WIZARD_STEPS } from './stepConfig';
 import { StepSidebar } from './StepSidebar';
 import { ProgressBar } from './ProgressBar';
@@ -35,6 +36,14 @@ export function WizardLayout({ onComplete }: WizardLayoutProps) {
 
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === WIZARD_STEPS.length - 1;
+
+  // For the last step (StepResult), assemble the full payload from all previous steps
+  const stepDataForCurrent = useMemo(() => {
+    if (isLastStep) {
+      return assemblePayload(stepData) as unknown as StepData;
+    }
+    return stepData[currentStep];
+  }, [isLastStep, stepData, currentStep]);
 
   // Ref to trigger form submission from NavigationButtons
   const submitRef = useRef<(() => void) | null>(null);
@@ -133,7 +142,7 @@ export function WizardLayout({ onComplete }: WizardLayoutProps) {
             }
           >
             <StepComponent
-              data={stepData[currentStep]}
+              data={stepDataForCurrent}
               onValidSubmit={handleValidSubmit}
               registerSubmit={registerSubmit}
             />
