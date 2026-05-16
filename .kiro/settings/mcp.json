@@ -1,0 +1,81 @@
+{
+  "mcpServers": {
+    "drawio": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "https://github.com/aws-samples/sample-drawio-mcp/releases/latest/download/drawio-mcp-server-latest.tgz",
+        "--no-cache"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "create_diagram",
+        "get_layout_guidance",
+        "plan_layout",
+        "insert_aws_group",
+        "insert_aws_icon",
+        "batch_insert_edges",
+        "save_diagram"
+      ]
+    },
+    "openrouter": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mcpservers/openrouterai"
+      ],
+      "env": {
+        "OPENROUTER_API_KEY": "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"
+      },
+      "disabled": true,
+      "autoApprove": []
+    },
+    "awslabs-aws-documentation-mcp-server": {
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "tool",
+        "run",
+        "--from",
+        "awslabs.aws-documentation-mcp-server@latest",
+        "awslabs.aws-documentation-mcp-server.exe"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "autoApprove": []
+    },
+    "awslabs.billing-cost-management-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.billing-cost-management-mcp-server@latest",
+        "awslabs.billing-cost-management-mcp-server.exe"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "AWS_PROFILE": "default",
+        "AWS_REGION": "us-east-1"
+      },
+      "disabled": false,
+      "autoApprove": []
+    },
+    "awslabs.aws-pricing-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.aws-pricing-mcp-server@latest",
+        "awslabs.aws-pricing-mcp-server.exe"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "AWS_PROFILE": "default",
+        "AWS_REGION": "us-east-1"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}

@@ -22,3 +22,15 @@ export interface ArchitectureOutput {
   cloudformation_template_url?: string;
   pricing_calculator_url?: string;
 }
+
+export interface AwsCredentialsInput {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken: string;
+}
+
+export interface AwsCredentialsInput {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken: string;
+}

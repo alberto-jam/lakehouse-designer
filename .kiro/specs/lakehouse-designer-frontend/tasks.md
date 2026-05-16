@@ -57,14 +57,14 @@ Implementação incremental do frontend SPA (React 18+ / TypeScript / Vite / Tai
     - Usar chave `lakehouse_aws_credentials` no localStorage
     - _Requisitos: 1.2, 1.3, 1.5, 1.6_
 
-  - [ ]* 3.3 Escrever teste de propriedade para round-trip de credenciais
+  - [x]* 3.3 Escrever teste de propriedade para round-trip de credenciais
     - **Propriedade 1: Round-trip de credenciais**
     - Criar `src/services/__tests__/credentialsService.property.test.ts`
     - Para quaisquer 3 strings não-vazias, `saveCredentials` seguido de `getCredentials` deve retornar os mesmos valores
     - Usar `fast-check` com mínimo de 100 iterações
     - **Valida: Requisito 1.2**
 
-  - [ ]* 3.4 Escrever teste de propriedade para rejeição de credenciais vazias
+  - [x]* 3.4 Escrever teste de propriedade para rejeição de credenciais vazias
     - **Propriedade 2: Rejeição de credenciais vazias ou whitespace**
     - Criar teste no mesmo arquivo `credentialsService.property.test.ts`
     - Para qualquer conjunto onde pelo menos uma string é vazia/whitespace, `saveCredentials` deve retornar false e localStorage não deve ser alterado
@@ -142,7 +142,7 @@ Implementação incremental do frontend SPA (React 18+ / TypeScript / Vite / Tai
     - Estilização com Tailwind CSS, responsivo
     - _Requisitos: 1.1, 1.2, 1.4, 1.5, 1.6_
 
-  - [ ]* 8.2 Escrever testes unitários para ModalCredenciais
+  - [x]* 8.2 Escrever testes unitários para ModalCredenciais
     - Criar `src/components/__tests__/ModalCredenciais.test.tsx`
     - Testar: exibe quando isOpen=true, oculta quando isOpen=false, preenche com initialValues, exibe validação para campos vazios, chama onSave e onClear corretamente
     - _Requisitos: 1.1, 1.2, 1.4, 1.5, 1.6_
@@ -158,13 +158,13 @@ Implementação incremental do frontend SPA (React 18+ / TypeScript / Vite / Tai
     - Estilização com Tailwind CSS, responsivo
     - _Requisitos: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-  - [ ]* 9.2 Escrever teste de propriedade para validação do formulário
+  - [x]* 9.2 Escrever teste de propriedade para validação do formulário
     - **Propriedade 6: Validação do formulário rejeita entrada inválida**
     - Criar `src/components/__tests__/Formulario.property.test.tsx`
     - Para qualquer estado do formulário com pelo menos um campo numérico ≤ 0 ou campo vazio, a submissão deve ser impedida
     - **Valida: Requisitos 3.2, 3.3**
 
-  - [ ]* 9.3 Escrever testes unitários para Formulario
+  - [x]* 9.3 Escrever testes unitários para Formulario
     - Criar `src/components/__tests__/Formulario.test.tsx`
     - Testar: renderiza todos os 5 campos, desabilita botão durante loading, exibe validação para campos inválidos, chama onSubmit com dados válidos
     - _Requisitos: 3.1, 3.2, 3.3, 3.4, 3.5_
@@ -235,7 +235,7 @@ Implementação incremental do frontend SPA (React 18+ / TypeScript / Vite / Tai
     - Para qualquer array de strings de passos, o componente deve renderizar todos na mesma ordem
     - **Valida: Requisito 7.1**
 
-  - [ ]* 11.11 Escrever testes unitários para ResultadoArquitetura
+  - [x]* 11.11 Escrever testes unitários para ResultadoArquitetura
     - Criar `src/components/__tests__/ResultadoArquitetura.test.tsx`
     - Testar: exibe tipo de arquitetura formatado, lista de serviços, mensagem, tabela de custos, diagrama, passos, botão download
     - _Requisitos: 4.1, 4.2, 4.3, 7.1_
@@ -255,7 +255,7 @@ Implementação incremental do frontend SPA (React 18+ / TypeScript / Vite / Tai
     - Layout responsivo com Tailwind CSS: grid/flex para desktop, coluna para mobile
     - _Requisitos: 1.1, 1.3, 1.4, 8.1, 8.2, 8.3, 8.4, 8.5, 9.2, 9.3_
 
-  - [ ]* 13.2 Escrever testes de integração para App.tsx
+  - [x]* 13.2 Escrever testes de integração para App.tsx
     - Criar `src/__tests__/App.test.tsx`
     - Testar fluxos: app carrega sem credenciais → modal aparece; app carrega com credenciais → formulário visível; submissão com erro 403 → mensagem de erro exibida
     - Usar mocks para apiClient e credentialsService

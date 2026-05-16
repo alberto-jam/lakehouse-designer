@@ -237,6 +237,42 @@ Resources:
             Path: /generate-architecture
             Method: POST
 
+  # ==================== LAMBDA GENERATE V2 ====================
+  GenerateV2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: generate_v2.lambda_handler
+      Tags:
+        CLIENTE: !Ref TagCliente
+        AMBIENTE: !Ref TagAmbiente
+        PROJETO: !Ref TagProjeto
+        AUTOR: !Ref TagAutor
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HistoryTable
+        - S3CrudPolicy:
+            BucketName: !Ref TemplatesBucket
+        - CloudWatchLogsFullAccess
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - pricing:GetProducts
+                - pricing:DescribeServices
+              Resource: "*"
+      Environment:
+        Variables:
+          TEMPLATES_BUCKET: !Ref TemplatesBucket
+          TABLE_NAME: !Ref HistoryTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LakeHouseAPI
+            Path: /generate-v2
+            Method: POST
+
   # ==================== API GATEWAY ====================
   LakeHouseAPI:
     Type: AWS::Serverless::Api

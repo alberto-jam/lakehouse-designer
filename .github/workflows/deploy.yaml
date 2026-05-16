@@ -141,6 +141,7 @@ jobs:
         working-directory: ./frontend
         run: |
           echo "VITE_API_URL=${{ needs.deploy-backend.outputs.api_endpoint }}/generate-architecture" > .env
+          echo "VITE_API_BASE_URL=${{ needs.deploy-backend.outputs.api_endpoint }}" >> .env
           echo "VITE_AWS_REGION=${{ env.AWS_REGION }}" >> .env
           echo "VITE_AWS_IDENTITY_POOL_ID=${{ needs.deploy-backend.outputs.identity_pool_id }}" >> .env
 

@@ -2,6 +2,22 @@
 
 SPA (Single Page Application) construída com React 18+, TypeScript, Vite e Tailwind CSS para gerar recomendações de arquitetura Lake House na AWS. O usuário informa parâmetros de carga de trabalho e recebe uma arquitetura recomendada com estimativa de custo mensal, diagrama visual (Mermaid), passos de provisionamento e link para download do template CloudFormation.
 
+## V2 — Wizard Multi-Etapas
+
+A versão 2 introduz um wizard guiado com nove etapas sequenciais para design de arquiteturas Lakehouse na AWS:
+
+1. **Projeto** — Nome, região AWS e ambiente (dev/staging/prod)
+2. **Fontes de Dados** — Volume em TB, registros/dia, formatos (CSV, JSON, Parquet, Avro, ORC)
+3. **Ingestão** — DMS CDC, padrão batch/streaming/hybrid, frequência
+4. **Storage/Lakehouse** — Camadas (Raw/Curated/Refined), formato de arquivo, compressão, particionamento
+5. **Processamento** — Engine ETL (Glue/EMR), complexidade de queries, latência, concorrência
+6. **Governança** — Lake Formation, segurança por coluna, criptografia
+7. **Analytics/Serving** — Athena, Redshift, QuickSight, APIs externas
+8. **Custos** — Região de pricing, orçamento limite, tags de alocação
+9. **Resultado** — Diagrama .drawio, preview Mermaid, cost breakdown detalhado, warnings de arquitetura
+
+O wizard utiliza o endpoint `POST /generate-v2` para gerar a arquitetura completa com diagrama, estimativa de custos (incluindo unit prices e assumptions) e warnings consultivos.
+
 ## Pré-requisitos
 
 - Node.js 18+
@@ -25,8 +41,12 @@ Edite o arquivo `.env` com os valores adequados:
 
 | Variável | Descrição | Exemplo |
 |----------|-----------|---------|
-| `VITE_API_URL` | URL do endpoint da API Gateway (POST /generate-architecture) | `https://xxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/generate-architecture` |
-| `VITE_AWS_REGION` | Região AWS onde a API está implantada (default: `us-east-1`) | `us-east-1` |
+| `VITE_API_URL` | URL completa do endpoint V1 (POST /generate-architecture) | `https://xxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/generate-architecture` |
+| `VITE_API_BASE_URL` | URL base da API para endpoints V2 (sem trailing slash) | `https://xxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod` |
+| `VITE_AWS_REGION` | Região AWS onde a API está implantada | `us-east-1` |
+| `VITE_AWS_IDENTITY_POOL_ID` | Cognito Identity Pool ID (acesso não autenticado) | `us-east-1:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
+
+> **Nota:** `VITE_API_BASE_URL` é obrigatória para o wizard V2. O frontend exibirá erro de configuração se não estiver definida.
 
 ## Execução Local
 
@@ -43,6 +63,14 @@ npm run build
 ```
 
 Gera arquivos estáticos (HTML, CSS, JS) no diretório `dist/`. Esses arquivos podem ser servidos por qualquer servidor web estático ou CDN (como CloudFront + S3), sem necessidade de servidor Node.js em runtime.
+
+## Preview do Build
+
+```bash
+npm run preview
+```
+
+Serve localmente o build de produção para validação antes do deploy.
 
 ## Execução de Testes
 
@@ -87,23 +115,36 @@ Após obter as credenciais, copie os valores de **Access Key ID**, **Secret Acce
 ```
 frontend/src/
 ├── components/
-│   ├── Header.tsx              # Cabeçalho com título e botão de credenciais
-│   ├── Footer.tsx              # Rodapé com disclaimer
-│   ├── Formulario.tsx          # Formulário de entrada de parâmetros
-│   ├── ModalCredenciais.tsx    # Modal para entrada de credenciais AWS
-│   ├── ResultadoArquitetura.tsx # Painel de resultado da arquitetura
-│   ├── TabelaCusto.tsx         # Tabela de estimativa de custo por serviço
-│   ├── DiagramaMermaid.tsx     # Renderizador de diagramas Mermaid → SVG
-│   └── BotaoDownload.tsx       # Botão de download do template CloudFormation
+│   ├── wizard/
+│   │   ├── WizardLayout.tsx          # Orquestrador principal do wizard V2
+│   │   ├── ProgressBar.tsx           # Indicador de progresso por etapa
+│   │   ├── StepSidebar.tsx           # Navegação lateral com status dos passos
+│   │   ├── SummaryPanel.tsx          # Resumo das seleções anteriores
+│   │   ├── NavigationButtons.tsx     # Botões Voltar/Próximo/Pular/Gerar
+│   │   └── steps/                    # Componentes de cada etapa (StepProject, StepSources, etc.)
+│   ├── result/
+│   │   ├── CostBreakdown.tsx         # Tabela de custos com assumptions e notes
+│   │   ├── ArchitectureWarnings.tsx  # Lista de warnings com severidade
+│   │   ├── JsonViewer.tsx            # Visualizador JSON com collapse/expand
+│   │   └── DiagramDownload.tsx       # Download do arquivo .drawio
+│   ├── ui/                           # Primitivos UI (Button, Card, Input, Select, etc.)
+│   ├── Header.tsx
+│   ├── Footer.tsx
+│   ├── Formulario.tsx                # Formulário V1 (mantido para compatibilidade)
+│   ├── DiagramaMermaid.tsx           # Renderizador Mermaid → SVG
+│   └── ...
+├── hooks/
+│   ├── useWizardState.ts             # Gerenciamento de estado do wizard (useReducer)
+│   ├── useStepValidation.ts          # Validação por campo com feedback em tempo real
+│   └── useGenerateV2.ts              # Hook de chamada à API /generate-v2
 ├── services/
-│   ├── types.ts                # Interfaces TypeScript (ArchitectureInput, ArchitectureOutput, AwsCredentialsInput)
-│   ├── credentialsService.ts   # Gerenciamento de credenciais AWS (localStorage)
-│   └── apiClient.ts            # Cliente API com assinatura SigV4
-├── App.tsx                     # Componente raiz — orquestra estado e componentes
-├── App.css                     # Estilos base
-├── main.tsx                    # Ponto de entrada React
-├── index.css                   # Diretivas Tailwind CSS
-└── test-setup.ts               # Configuração do ambiente de testes
+│   ├── typesV2.ts                    # Interfaces TypeScript V2
+│   ├── apiClient.ts                  # Cliente API (V1 + V2)
+│   ├── types.ts                      # Interfaces V1
+│   └── credentialsService.ts         # Gerenciamento de credenciais AWS
+├── App.tsx                           # Componente raiz — V1 e V2 coexistem
+├── main.tsx                          # Ponto de entrada React
+└── test-setup.ts                     # Configuração do ambiente de testes
 ```
 
 ## Deploy

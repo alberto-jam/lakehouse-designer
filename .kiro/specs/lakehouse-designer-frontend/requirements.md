@@ -1,10 +1,10 @@
-# Documento de Requisitos — Lake House Designer Frontend
+# Requirements Document
 
-## Introdução
+## Introduction
 
 O Lake House Designer é um sistema interno corporativo que permite aos usuários informar parâmetros de carga de trabalho (volume de dados, latência, concorrência, etc.) e receber uma arquitetura Lake House recomendada na AWS, incluindo estimativa de custo mensal por serviço, diagrama visual e template CloudFormation para provisionamento. Este documento especifica os requisitos do frontend SPA (Single Page Application) construído com React 18+, TypeScript, Vite e Tailwind CSS, que se comunica com um backend serverless existente (API Gateway com autenticação AWS_IAM + Lambda).
 
-## Glossário
+## Glossary
 
 - **SPA**: Single Page Application — aplicação web de página única que roda inteiramente no navegador
 - **Lake_House_Designer**: O sistema completo (frontend + backend) que gera recomendações de arquitetura Lake House na AWS
@@ -25,7 +25,7 @@ O Lake House Designer é um sistema interno corporativo que permite aos usuário
 - **Role_Assumida**: IAM Role assumida pelo usuário corporativo via AWS SSO ou STS AssumeRole, que concede privilégios administrativos incluindo permissão `execute-api:Invoke`
 - **Credenciais_Temporarias**: Conjunto de Access Key ID, Secret Access Key e Session Token com validade limitada, obtidos pelo usuário via AWS SSO ou STS AssumeRole antes de acessar o Frontend
 
-## Requisitos
+## Requirements
 
 ### Requisito 1: Obtenção de Credenciais AWS via Entrada Manual
 
