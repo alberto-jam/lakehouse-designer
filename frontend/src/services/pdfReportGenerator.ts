@@ -40,6 +40,92 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 }
 
 /**
+ * Captures the rendered Mermaid diagram from the DOM as a PNG data URL.
+ * Looks for the SVG element rendered by the DiagramaMermaid component.
+ */
+async function captureMermaidDiagramAsImage(): Promise<string | null> {
+  try {
+    // Find the Mermaid SVG in the DOM
+    const svgElement = document.querySelector('.mermaid svg') || document.querySelector('[data-testid="mermaid-diagram"] svg') || document.querySelector('svg[id^="mermaid"]');
+    if (!svgElement) return null;
+
+    // Clone and serialize the SVG
+    const svgClone = svgElement.cloneNode(true) as SVGElement;
+    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+    // Set explicit dimensions
+    const bbox = svgElement.getBoundingClientRect();
+    svgClone.setAttribute('width', String(bbox.width));
+    svgClone.setAttribute('height', String(bbox.height));
+
+    const svgData = new XMLSerializer().serializeToString(svgClone);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    // Render SVG to canvas
+    const canvas = document.createElement('canvas');
+    const scale = 2; // Higher resolution
+    canvas.width = bbox.width * scale;
+    canvas.height = bbox.height * scale;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { URL.revokeObjectURL(url); return null; }
+
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const img = new Image();
+    const imageLoaded = new Promise<string | null>((resolve) => {
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+    });
+
+    img.src = url;
+    return await imageLoaded;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sanitizes text by replacing Unicode characters that jsPDF cannot render
+ * with ASCII equivalents.
+ */
+function sanitizeText(text: string): string {
+  return text
+    .replace(/\u2192/g, '->')   // → arrow
+    .replace(/\u2190/g, '<-')   // ← arrow
+    .replace(/\u2194/g, '<->') // ↔ arrow
+    .replace(/\u00d7/g, 'x')   // × multiplication
+    .replace(/\u2013/g, '-')   // – en dash
+    .replace(/\u2014/g, '--')  // — em dash
+    .replace(/\u2018/g, "'")   // ' left single quote
+    .replace(/\u2019/g, "'")   // ' right single quote
+    .replace(/\u201c/g, '"')   // " left double quote
+    .replace(/\u201d/g, '"')   // " right double quote
+    .replace(/\u2026/g, '...') // … ellipsis
+    .replace(/\u00e9/g, 'e')   // é
+    .replace(/\u00e3/g, 'a')   // ã
+    .replace(/\u00e7/g, 'c')   // ç
+    .replace(/\u00f5/g, 'o')   // õ
+    .replace(/\u00e1/g, 'a')   // á
+    .replace(/\u00ed/g, 'i')   // í
+    .replace(/\u00f3/g, 'o')   // ó
+    .replace(/\u00fa/g, 'u')   // ú
+    .replace(/\u00ea/g, 'e')   // ê
+    .replace(/\u00f4/g, 'o')   // ô
+    .replace(/\u00e2/g, 'a')   // â
+    .replace(/[^\x00-\x7F]/g, ''); // Remove any remaining non-ASCII
+}
+
+/**
  * Generates a PDF report from the architecture generation response.
  */
 export async function generatePdfReport(
@@ -59,22 +145,22 @@ export async function generatePdfReport(
   // Header with logo
   // =========================================================================
   if (logoBase64) {
-    doc.addImage(logoBase64, 'PNG', margin, y, 30, 30);
-    y += 5;
+    doc.addImage(logoBase64, 'PNG', margin, y, 50, 18);
+    y += 3;
   }
 
   // Title
   doc.setFontSize(20);
   doc.setTextColor(...COLORS.primary);
   doc.setFont('helvetica', 'bold');
-  doc.text('Lakehouse Designer', logoBase64 ? margin + 35 : margin, y + 8);
+  doc.text('Lakehouse Designer', logoBase64 ? margin + 55 : margin, y + 6);
 
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...COLORS.secondary);
-  doc.text('Relatório de Arquitetura', logoBase64 ? margin + 35 : margin, y + 16);
+    doc.text('Relatorio de Arquitetura', logoBase64 ? margin + 55 : margin, y + 14);
 
-  y += logoBase64 ? 35 : 25;
+  y += logoBase64 ? 25 : 25;
 
   // Separator line
   doc.setDrawColor(...COLORS.primary);
@@ -88,7 +174,7 @@ export async function generatePdfReport(
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...COLORS.primary);
-  doc.text('Informações do Projeto', margin, y);
+  doc.text('Informacoes do Projeto', margin, y);
   y += 7;
 
   doc.setFontSize(10);
@@ -116,7 +202,7 @@ export async function generatePdfReport(
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...COLORS.primary);
-    doc.text('Serviços da Arquitetura', margin, y);
+    doc.text('Servicos da Arquitetura', margin, y);
     y += 3;
 
     const servicesData = response.spec.services.map((s) => [
@@ -126,7 +212,7 @@ export async function generatePdfReport(
 
     autoTable(doc, {
       startY: y,
-      head: [['Serviço', 'Camada']],
+      head: [['Servico', 'Camada']],
       body: servicesData,
       margin: { left: margin, right: margin },
       styles: { fontSize: 9, cellPadding: 3 },
@@ -168,7 +254,7 @@ export async function generatePdfReport(
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...COLORS.secondary);
     if (response.cost_estimate.pricing_location) {
-      doc.text(`Região: ${response.cost_estimate.pricing_location}`, margin, y + 5);
+      doc.text(`Regiao: ${response.cost_estimate.pricing_location}`, margin, y + 5);
       y += 5;
     }
     y += 3;
@@ -185,7 +271,7 @@ export async function generatePdfReport(
 
       autoTable(doc, {
         startY: y,
-        head: [['Serviço', 'Custo Mensal', 'Preço Unit.', 'Unidade', 'Quantidade']],
+        head: [['Servico', 'Custo Mensal', 'Preco Unit.', 'Unidade', 'Quantidade']],
         body: costData,
         margin: { left: margin, right: margin },
         styles: { fontSize: 8, cellPadding: 2.5 },
@@ -219,7 +305,7 @@ export async function generatePdfReport(
       doc.setTextColor(...COLORS.secondary);
       response.cost_estimate.assumptions.forEach((assumption) => {
         y = checkPageBreak(doc, y, 6);
-        doc.text(`• ${assumption}`, margin + 3, y);
+        doc.text(`• ${sanitizeText(assumption)}`, margin + 3, y);
         y += 5;
       });
       y += 5;
@@ -239,7 +325,7 @@ export async function generatePdfReport(
       doc.setTextColor(...COLORS.secondary);
       response.cost_estimate.notes.forEach((note) => {
         y = checkPageBreak(doc, y, 6);
-        doc.text(`• ${note}`, margin + 3, y);
+        doc.text(`• ${sanitizeText(note)}`, margin + 3, y);
         y += 5;
       });
       y += 5;
@@ -269,14 +355,14 @@ export async function generatePdfReport(
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...color);
-      doc.text(`[${warning.severity.toUpperCase()}] ${warning.message}`, margin, y);
+      doc.text(`[${warning.severity.toUpperCase()}] ${sanitizeText(warning.message)}`, margin, y);
       y += 5;
 
       if (warning.recommendation) {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...COLORS.secondary);
-        const lines = doc.splitTextToSize(`Recomendação: ${warning.recommendation}`, contentWidth - 5);
+        const lines = doc.splitTextToSize(`Recomendacao: ${sanitizeText(warning.recommendation)}`, contentWidth - 5);
         doc.text(lines, margin + 3, y);
         y += lines.length * 4 + 3;
       }
@@ -301,7 +387,7 @@ export async function generatePdfReport(
 
     response.provisioning_steps.forEach((step, index) => {
       y = checkPageBreak(doc, y, 8);
-      const lines = doc.splitTextToSize(`${index + 1}. ${step}`, contentWidth - 5);
+      const lines = doc.splitTextToSize(`${index + 1}. ${sanitizeText(step)}`, contentWidth - 5);
       doc.text(lines, margin + 3, y);
       y += lines.length * 4 + 2;
     });
@@ -309,26 +395,37 @@ export async function generatePdfReport(
   }
 
   // =========================================================================
-  // Mermaid Diagram (text representation)
+  // Mermaid Diagram (rendered image from DOM)
   // =========================================================================
-  if (response.mermaid_diagram) {
-    y = checkPageBreak(doc, y, 30);
+  const diagramImage = await captureMermaidDiagramAsImage();
+  if (diagramImage) {
+    y = checkPageBreak(doc, y, 100);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...COLORS.primary);
-    doc.text('Diagrama de Arquitetura (Mermaid)', margin, y);
+    doc.text('Diagrama de Arquitetura', margin, y);
     y += 7;
 
-    doc.setFontSize(7);
-    doc.setFont('courier', 'normal');
-    doc.setTextColor(...COLORS.secondary);
+    // Calculate image dimensions to fit within content width
+    const img = new Image();
+    img.src = diagramImage;
+    await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
 
-    const mermaidLines = response.mermaid_diagram.split('\n');
-    mermaidLines.forEach((line) => {
-      y = checkPageBreak(doc, y, 5);
-      doc.text(line, margin + 3, y);
-      y += 3.5;
-    });
+    const imgAspectRatio = img.naturalWidth / img.naturalHeight;
+    const maxImgWidth = contentWidth;
+    const maxImgHeight = 120; // max height in mm
+    let imgWidth = maxImgWidth;
+    let imgHeight = imgWidth / imgAspectRatio;
+
+    if (imgHeight > maxImgHeight) {
+      imgHeight = maxImgHeight;
+      imgWidth = imgHeight * imgAspectRatio;
+    }
+
+    // Check if we need a new page for the image
+    y = checkPageBreak(doc, y, imgHeight + 5);
+    doc.addImage(diagramImage, 'PNG', margin, y, imgWidth, imgHeight);
+    y += imgHeight + 10;
   }
 
   // =========================================================================
@@ -341,7 +438,7 @@ export async function generatePdfReport(
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...COLORS.secondary);
     doc.text(
-      `Gerado por Lakehouse Designer — Forceone | Página ${i} de ${pageCount}`,
+      `Gerado por Lakehouse Designer - Forceone | Pagina ${i} de ${pageCount}`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 8,
       { align: 'center' }
