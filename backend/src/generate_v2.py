@@ -15,6 +15,7 @@ from schema_v2 import validate_request, ValidationError
 from pricing_service import get_prices, FALLBACK_PRICES
 from diagram_generator import generate_mermaid_v2, generate_drawio
 from warning_engine import analyze_architecture
+from orchestrator import create_pricing_calculator_estimate
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -77,7 +78,51 @@ def lambda_handler(event, context):
     # 8. Get provisioning steps
     provisioning_steps = _get_provisioning_steps_v2(validated, architecture)
 
-    # 9. Build response
+    # 9. Create AWS Pricing Calculator estimate if requested
+    pricing_calculator_url = None
+    costs_section = validated.get('costs', {})
+    if costs_section.get('create_estimate', False):
+        try:
+            # Convert V2 cost breakdown to V1 format (service_name -> cost dict)
+            cost_breakdown_dict = {}
+            for item in cost_estimate.get('breakdown', []):
+                service_name = item.get('service', '')
+                # Map to the keys expected by build_usage_items
+                if 'S3' in service_name:
+                    cost_breakdown_dict['S3'] = item['monthly_cost_usd']
+                elif 'Glue' in service_name:
+                    cost_breakdown_dict['Glue'] = item['monthly_cost_usd']
+                elif 'Athena' in service_name:
+                    cost_breakdown_dict['Athena'] = item['monthly_cost_usd']
+                elif 'Redshift' in service_name:
+                    cost_breakdown_dict['Redshift'] = item['monthly_cost_usd']
+                elif 'DMS' in service_name:
+                    cost_breakdown_dict['DMS'] = item['monthly_cost_usd']
+                elif 'API Gateway' in service_name or 'Lambda' in service_name:
+                    cost_breakdown_dict['API Gateway (External)'] = item['monthly_cost_usd']
+                elif 'QuickSight' in service_name:
+                    cost_breakdown_dict['QuickSight'] = item['monthly_cost_usd']
+
+            # Build input_params from the validated request for usage calculation
+            input_params = {
+                'data_volume_tb': validated.get('sources', {}).get('data_volume_tb', 0),
+                'records_per_day_millions': validated.get('sources', {}).get('records_per_day_millions', 0),
+                'data_source_count': validated.get('sources', {}).get('data_source_count', 0),
+                'dms_cdc_db_count': validated.get('ingestion', {}).get('dms_cdc_db_count', 0),
+                'external_api_count': validated.get('analytics', {}).get('external_api_count', 0),
+            }
+
+            pricing_calculator_url = create_pricing_calculator_estimate(
+                architecture_type=spec.get('architecture_type', 'lakehouse'),
+                cost_breakdown=cost_breakdown_dict,
+                input_params=input_params,
+                prices=prices,
+            )
+        except Exception as e:
+            logger.warning("Failed to create pricing calculator estimate: %s", str(e))
+
+    # 10. Build response
+    # 10. Build response
     response = {
         'diagram': {
             'content_base64': drawio_b64,
@@ -90,6 +135,9 @@ def lambda_handler(event, context):
         'mermaid_diagram': mermaid_src,
         'provisioning_steps': provisioning_steps,
     }
+
+    if pricing_calculator_url:
+        response['pricing_calculator_url'] = pricing_calculator_url
 
     return {
         'statusCode': 200,

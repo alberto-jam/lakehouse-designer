@@ -296,6 +296,28 @@ export default function StepResult({ data, onValidSubmit, registerSubmit }: Step
         />
       </Section>
 
+      {/* 3.5 Pricing Calculator Link */}
+      {result.pricing_calculator_url && (
+        <Section title="AWS Pricing Calculator" testId="section-pricing-calculator">
+          <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <svg className="w-5 h-5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-blue-800">Estimativa criada no AWS Pricing Calculator</p>
+              <a
+                href={result.pricing_calculator_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:text-blue-800 underline break-all"
+              >
+                Abrir no Console AWS
+              </a>
+            </div>
+          </div>
+        </Section>
+      )}
+
       {/* 4. Cost Breakdown */}
       {result.cost_estimate && (
         <Section title="Estimativa de Custos" testId="section-costs">
