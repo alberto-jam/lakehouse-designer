@@ -41,7 +41,7 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 
 /**
  * Captures the rendered Mermaid diagram from the DOM as a PNG data URL.
- * Looks for the SVG element rendered by the DiagramaMermaid component.
+ * Uses inline SVG serialization to avoid tainted canvas issues.
  */
 async function captureMermaidDiagramAsImage(): Promise<string | null> {
   try {
@@ -49,48 +49,95 @@ async function captureMermaidDiagramAsImage(): Promise<string | null> {
     const svgElement = document.querySelector('.mermaid svg') || document.querySelector('[data-testid="mermaid-diagram"] svg') || document.querySelector('svg[id^="mermaid"]');
     if (!svgElement) return null;
 
-    // Clone and serialize the SVG
+    // Clone the SVG
     const svgClone = svgElement.cloneNode(true) as SVGElement;
     svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    svgClone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
 
     // Set explicit dimensions
     const bbox = svgElement.getBoundingClientRect();
-    svgClone.setAttribute('width', String(bbox.width));
-    svgClone.setAttribute('height', String(bbox.height));
+    svgClone.setAttribute('width', String(Math.ceil(bbox.width)));
+    svgClone.setAttribute('height', String(Math.ceil(bbox.height)));
 
+    // Inline all computed styles to make the SVG self-contained
+    inlineStyles(svgElement as SVGElement, svgClone);
+
+    // Remove any foreignObject elements that cause taint issues
+    const foreignObjects = svgClone.querySelectorAll('foreignObject');
+    foreignObjects.forEach((fo) => {
+      // Replace foreignObject with a simple text element
+      const text = fo.textContent || '';
+      const parent = fo.parentNode;
+      if (parent) {
+        const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        textEl.textContent = text;
+        textEl.setAttribute('font-size', '14');
+        textEl.setAttribute('fill', '#333');
+        const x = fo.getAttribute('x') || '0';
+        const y = fo.getAttribute('y') || '0';
+        textEl.setAttribute('x', x);
+        textEl.setAttribute('y', y);
+        parent.replaceChild(textEl, fo);
+      }
+    });
+
+    // Serialize to SVG string
     const svgData = new XMLSerializer().serializeToString(svgClone);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
 
-    // Render SVG to canvas
+    // Create a clean SVG data URL
+    const svgBase64 = btoa(unescape(encodeURIComponent(svgData)));
+    const svgDataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+    // Render to canvas using a clean image (no external resources = no taint)
     const canvas = document.createElement('canvas');
-    const scale = 2; // Higher resolution
-    canvas.width = bbox.width * scale;
-    canvas.height = bbox.height * scale;
+    const scale = 2;
+    canvas.width = Math.ceil(bbox.width) * scale;
+    canvas.height = Math.ceil(bbox.height) * scale;
     const ctx = canvas.getContext('2d');
-    if (!ctx) { URL.revokeObjectURL(url); return null; }
+    if (!ctx) return null;
 
     ctx.scale(scale, scale);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const img = new Image();
-    const imageLoaded = new Promise<string | null>((resolve) => {
+    return new Promise<string | null>((resolve) => {
+      const img = new Image();
       img.onload = () => {
         ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/png'));
+        try {
+          resolve(canvas.toDataURL('image/png'));
+        } catch {
+          // If still tainted, return SVG data URL directly (jsPDF can handle SVG)
+          resolve(svgDataUrl);
+        }
       };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve(null);
-      };
+      img.onerror = () => resolve(null);
+      // Use the base64 SVG data URL — this avoids cross-origin issues
+      img.src = svgDataUrl;
     });
-
-    img.src = url;
-    return await imageLoaded;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Recursively inlines computed styles from source to clone elements.
+ */
+function inlineStyles(source: Element, clone: Element): void {
+  const computedStyle = window.getComputedStyle(source);
+  const importantStyles = ['fill', 'stroke', 'stroke-width', 'font-family', 'font-size', 'font-weight', 'opacity', 'color', 'background'];
+
+  importantStyles.forEach((prop) => {
+    const value = computedStyle.getPropertyValue(prop);
+    if (value && value !== 'none' && value !== '') {
+      (clone as HTMLElement).style?.setProperty(prop, value);
+    }
+  });
+
+  const sourceChildren = source.children;
+  const cloneChildren = clone.children;
+  for (let i = 0; i < sourceChildren.length && i < cloneChildren.length; i++) {
+    inlineStyles(sourceChildren[i], cloneChildren[i]);
   }
 }
 
@@ -139,14 +186,24 @@ export async function generatePdfReport(
   let y = margin;
 
   // Load logo
-  const logoBase64 = await loadImageAsBase64(LOGO_PATH);
+  let logoBase64: string | null = null;
+  try {
+    logoBase64 = await loadImageAsBase64(LOGO_PATH);
+  } catch {
+    // Logo loading failed — continue without it
+  }
 
   // =========================================================================
   // Header with logo
   // =========================================================================
   if (logoBase64) {
-    doc.addImage(logoBase64, 'PNG', margin, y, 50, 18);
-    y += 3;
+    try {
+      doc.addImage(logoBase64, 'PNG', margin, y, 50, 18);
+      y += 3;
+    } catch {
+      // Image insertion failed — continue without logo
+      logoBase64 = null;
+    }
   }
 
   // Title
@@ -158,7 +215,7 @@ export async function generatePdfReport(
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...COLORS.secondary);
-    doc.text('Relatorio de Arquitetura', logoBase64 ? margin + 55 : margin, y + 14);
+  doc.text('Relatorio de Arquitetura', logoBase64 ? margin + 55 : margin, y + 14);
 
   y += logoBase64 ? 25 : 25;
 
@@ -397,35 +454,39 @@ export async function generatePdfReport(
   // =========================================================================
   // Mermaid Diagram (rendered image from DOM)
   // =========================================================================
-  const diagramImage = await captureMermaidDiagramAsImage();
-  if (diagramImage) {
-    y = checkPageBreak(doc, y, 100);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...COLORS.primary);
-    doc.text('Diagrama de Arquitetura', margin, y);
-    y += 7;
+  try {
+    const diagramImage = await captureMermaidDiagramAsImage();
+    if (diagramImage) {
+      y = checkPageBreak(doc, y, 100);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...COLORS.primary);
+      doc.text('Diagrama de Arquitetura', margin, y);
+      y += 7;
 
-    // Calculate image dimensions to fit within content width
-    const img = new Image();
-    img.src = diagramImage;
-    await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
+      // Calculate image dimensions to fit within content width
+      const img = new Image();
+      img.src = diagramImage;
+      await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
 
-    const imgAspectRatio = img.naturalWidth / img.naturalHeight;
-    const maxImgWidth = contentWidth;
-    const maxImgHeight = 120; // max height in mm
-    let imgWidth = maxImgWidth;
-    let imgHeight = imgWidth / imgAspectRatio;
+      const imgAspectRatio = img.naturalWidth / (img.naturalHeight || 1);
+      const maxImgWidth = contentWidth;
+      const maxImgHeight = 120; // max height in mm
+      let imgWidth = maxImgWidth;
+      let imgHeight = imgWidth / (imgAspectRatio || 1);
 
-    if (imgHeight > maxImgHeight) {
-      imgHeight = maxImgHeight;
-      imgWidth = imgHeight * imgAspectRatio;
+      if (imgHeight > maxImgHeight) {
+        imgHeight = maxImgHeight;
+        imgWidth = imgHeight * imgAspectRatio;
+      }
+
+      // Check if we need a new page for the image
+      y = checkPageBreak(doc, y, imgHeight + 5);
+      doc.addImage(diagramImage, 'PNG', margin, y, imgWidth, imgHeight);
+      y += imgHeight + 10;
     }
-
-    // Check if we need a new page for the image
-    y = checkPageBreak(doc, y, imgHeight + 5);
-    doc.addImage(diagramImage, 'PNG', margin, y, imgWidth, imgHeight);
-    y += imgHeight + 10;
+  } catch {
+    // Diagram capture failed — skip diagram section
   }
 
   // =========================================================================
