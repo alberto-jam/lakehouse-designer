@@ -265,6 +265,7 @@ Resources:
               Action:
                 - bcm-pricing-calculator:CreateWorkloadEstimate
                 - bcm-pricing-calculator:BatchCreateWorkloadEstimateUsage
+                - bcm-pricing-calculator:CreateWorkloadEstimateUsage
               Resource:
                 - !Sub "arn:aws:bcm-pricing-calculator:*:${AWS::AccountId}:*"
             - Effect: Allow
