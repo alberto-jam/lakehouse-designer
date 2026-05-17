@@ -90,7 +90,36 @@ function assemblePayload(stepData: Record<number, StepData>): GenerateV2Request 
 
   // Optional sections — only include if step was completed
   if (processing) {
-    payload.processing = processing;
+    // StepProcessing collects some fields that belong to the analytics section
+    // (avg_query_complexity, max_query_latency_sec, concurrent_users, external_api_count).
+    // Merge them into analytics and send only processing-specific fields to the backend.
+    const processingRaw = processing as unknown as Record<string, unknown>;
+    const {
+      avg_query_complexity,
+      max_query_latency_sec,
+      concurrent_users,
+      external_api_count,
+      ...processingOnly
+    } = processingRaw;
+
+    // Override analytics fields with values from StepProcessing if they exist
+    if (avg_query_complexity !== undefined) {
+      (payload.analytics as unknown as Record<string, unknown>).avg_query_complexity = avg_query_complexity;
+    }
+    if (max_query_latency_sec !== undefined) {
+      (payload.analytics as unknown as Record<string, unknown>).max_query_latency_sec = max_query_latency_sec;
+    }
+    if (concurrent_users !== undefined) {
+      (payload.analytics as unknown as Record<string, unknown>).concurrent_users = concurrent_users;
+    }
+    if (external_api_count !== undefined) {
+      (payload.analytics as unknown as Record<string, unknown>).external_api_count = external_api_count;
+    }
+
+    // Only include processing section if it has processing-specific fields
+    if (Object.keys(processingOnly).length > 0) {
+      payload.processing = processingOnly as unknown as ProcessingData;
+    }
   }
   if (governance) {
     payload.governance = governance;
