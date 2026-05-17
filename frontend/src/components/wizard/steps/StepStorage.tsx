@@ -25,10 +25,10 @@ const COMPRESSION_OPTIONS = [
 
 const PARTITIONING_OPTIONS = [
   { value: '', label: 'Selecione...' },
-  { value: 'por_data', label: 'Por Data' },
-  { value: 'por_regiao', label: 'Por Região' },
-  { value: 'por_cliente', label: 'Por Cliente' },
-  { value: 'customizado', label: 'Customizado' },
+  { value: 'date', label: 'Por Data' },
+  { value: 'region', label: 'Por Região' },
+  { value: 'customer', label: 'Por Cliente' },
+  { value: 'custom', label: 'Customizado' },
 ];
 
 export default function StepStorage({ data, onValidSubmit, registerSubmit }: StepProps) {
