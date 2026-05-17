@@ -261,6 +261,16 @@ Resources:
                 - pricing:GetProducts
                 - pricing:DescribeServices
               Resource: "*"
+            - Effect: Allow
+              Action:
+                - bcm-pricing-calculator:CreateWorkloadEstimate
+                - bcm-pricing-calculator:BatchCreateWorkloadEstimateUsage
+              Resource:
+                - !Sub "arn:aws:bcm-pricing-calculator:*:${AWS::AccountId}:*"
+            - Effect: Allow
+              Action:
+                - sts:GetCallerIdentity
+              Resource: "*"
       Environment:
         Variables:
           TEMPLATES_BUCKET: !Ref TemplatesBucket
