@@ -62,8 +62,12 @@ export function WizardLayout({ onComplete }: WizardLayoutProps) {
    */
   const handleValidSubmit = useCallback(
     (data: StepData) => {
-      if (isLastStep && onComplete) {
-        onComplete();
+      if (isLastStep) {
+        // On the last step, generation completed — call onComplete if provided
+        // but never advance past the last step
+        if (onComplete) {
+          onComplete();
+        }
       } else {
         nextStep(data);
       }
