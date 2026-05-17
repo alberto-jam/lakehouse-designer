@@ -1,6 +1,7 @@
-import { Suspense, useCallback, useMemo, useRef } from 'react';
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { useWizardState } from '../../hooks/useWizardState';
 import { assemblePayload } from '../../hooks/useGenerateV2';
+import { generatePdfReport } from '../../services/pdfReportGenerator';
 import { WIZARD_STEPS } from './stepConfig';
 import { StepSidebar } from './StepSidebar';
 import { ProgressBar } from './ProgressBar';
@@ -8,6 +9,7 @@ import { NavigationButtons } from './NavigationButtons';
 import { SummaryPanel } from './SummaryPanel';
 import { Card } from '../ui';
 import type { StepData } from './types';
+import type { GenerateV2Response } from '../../services/typesV2';
 
 export interface WizardLayoutProps {
   onComplete?: () => void;
@@ -37,6 +39,9 @@ export function WizardLayout({ onComplete }: WizardLayoutProps) {
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === WIZARD_STEPS.length - 1;
 
+  // Track generation result for PDF export
+  const [generationResult, setGenerationResult] = useState<GenerateV2Response | null>(null);
+
   // For the last step (StepResult), assemble the full payload from all previous steps
   const stepDataForCurrent = useMemo(() => {
     if (isLastStep) {
@@ -63,8 +68,8 @@ export function WizardLayout({ onComplete }: WizardLayoutProps) {
   const handleValidSubmit = useCallback(
     (data: StepData) => {
       if (isLastStep) {
-        // On the last step, generation completed — call onComplete if provided
-        // but never advance past the last step
+        // On the last step, generation completed — save result for PDF export
+        setGenerationResult(data as unknown as GenerateV2Response);
         if (onComplete) {
           onComplete();
         }
@@ -94,6 +99,15 @@ export function WizardLayout({ onComplete }: WizardLayoutProps) {
       submitRef.current();
     }
   }, []);
+
+  /**
+   * Triggered by the "Gerar Relatório PDF" button after generation completes.
+   */
+  const handleGeneratePdf = useCallback(async () => {
+    if (!generationResult) return;
+    const projectName = (stepData[0] as { project_name?: string } | undefined)?.project_name || 'lakehouse';
+    await generatePdfReport(generationResult, projectName);
+  }, [generationResult, stepData]);
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 sm:gap-5 lg:gap-6 max-w-7xl mx-auto px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-6">
@@ -158,10 +172,12 @@ export function WizardLayout({ onComplete }: WizardLayoutProps) {
           isLastStep={isLastStep}
           isOptional={!stepConfig.required}
           isLoading={generationStatus === 'loading'}
+          generationCompleted={!!generationResult}
           onBack={prevStep}
           onNext={handleNext}
           onSkip={skipStep}
           onGenerate={handleGenerate}
+          onGeneratePdf={handleGeneratePdf}
         />
       </div>
 

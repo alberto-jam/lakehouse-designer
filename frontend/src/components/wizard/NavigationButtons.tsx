@@ -5,10 +5,12 @@ export interface NavigationButtonsProps {
   isLastStep: boolean;
   isOptional: boolean;
   isLoading: boolean;
+  generationCompleted?: boolean;
   onBack: () => void;
   onNext: () => void;
   onSkip: () => void;
   onGenerate: () => void;
+  onGeneratePdf?: () => void;
 }
 
 export function NavigationButtons({
@@ -16,10 +18,12 @@ export function NavigationButtons({
   isLastStep,
   isOptional,
   isLoading,
+  generationCompleted,
   onBack,
   onNext,
   onSkip,
   onGenerate,
+  onGeneratePdf,
 }: NavigationButtonsProps) {
   return (
     <div className="flex justify-between items-center">
@@ -56,7 +60,7 @@ export function NavigationButtons({
           </Button>
         )}
 
-        {isLastStep && (
+        {isLastStep && !generationCompleted && (
           <Button
             variant="primary"
             onClick={onGenerate}
@@ -64,6 +68,16 @@ export function NavigationButtons({
             isLoading={isLoading}
           >
             Gerar Arquitetura
+          </Button>
+        )}
+
+        {isLastStep && generationCompleted && onGeneratePdf && (
+          <Button
+            variant="primary"
+            onClick={onGeneratePdf}
+            disabled={isLoading}
+          >
+            Gerar Relatório PDF
           </Button>
         )}
       </div>
